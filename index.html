@@ -664,13 +664,22 @@ async function openRbMap(){
   var rb = await fetchRebalancer(); if(!rb) return;
   var names = Object.keys(rb.accounts);
   var opts = function(sel){ return '<option value="">연결 안 함</option>' + S.assets.filter(function(a){ return FIN_CATS.indexOf(a.cat) >= 0; }).map(function(a){
-    return '<option value="'+a.id+'" '+(a.id===sel?'selected':'')+'>'+esc(a.name)+(a.owner?' ('+esc(a.owner)+')':'')+'</option>'; }).join(''); };
+    return '<option value="'+a.id+'" '+(a.id===sel?'selected':'')+'>'+esc(assetLabel(a))+'</option>'; }).join('') + '<option value="new">+ 새 자산으로 추가</option>'; };
   openModal('<h3>리밸런서 계좌 연결</h3><div class="tiny" style="margin-bottom:12px">'+esc(rb.date)+' 기록 기준. 계좌마다 캐시플로우 자산을 고르면, 같은 자산에 연결된 계좌들의 평가액 합계가 그 자산 금액이 됩니다.</div>'+
     names.map(function(n,i){ return '<label class="f">'+esc(n)+' <span class="num">'+fm(num(rb.accounts[n].value)/10000)+'</span><select id="rbm'+i+'">'+opts(S.rbMap[n])+'</select></label>'; }).join('')+
     '<div class="btns"><button class="btn" onclick="saveRbMap()">저장하고 불러오기</button><button class="btn sub" onclick="closeModal()">취소</button></div>');
 }
+// 자산 이름에 명의가 이미 들어 있으면 한 번만 표시
+function assetLabel(a){ return a.name + (a.owner && a.name.indexOf(a.owner) < 0 ? ' (' + a.owner + ')' : ''); }
+// 리밸런서 계좌 이름으로 새 자산 만들기 (이름에 연금·IRP·퇴직이 있으면 연금계좌)
+function newAssetFromAccount(n){
+  var cat = /연금|IRP|퇴직|DC|ISA/i.test(n) ? 'pension' : 'stock';
+  if(/ISA/i.test(n)) cat = 'stock';
+  var a = {id:uid(), name:n, cat:cat, owner:'', value:0, note:'', bucket:defaultBucket(cat)};
+  S.assets.push(a); return a.id;
+}
 function saveRbMap(){
-  Object.keys(_rbLast.accounts).forEach(function(n,i){ S.rbMap[n] = fv('rbm'+i); });
+  Object.keys(_rbLast.accounts).forEach(function(n,i){ var v = fv('rbm'+i); S.rbMap[n] = v === 'new' ? newAssetFromAccount(n) : v; });
   closeModal(); applyRebalancer();
 }
 async function syncRebalancer(){
