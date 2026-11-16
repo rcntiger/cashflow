@@ -1,0 +1,17 @@
+{
+  "name": "캐시플로우",
+  "short_name": "캐시플로우",
+  "description": "가계 자산 장부 — 자산 기록, 현금흐름, 은퇴 시뮬레이션",
+  "lang": "ko",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#080C12",
+  "theme_color": "#080C12",
+  "icons": [
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}
