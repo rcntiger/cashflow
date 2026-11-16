@@ -116,10 +116,15 @@ var FIN_CATS = ['stock','pension','mutual','cash','other'];   // 시뮬레이션
 var TABS = [
   {id:'dash', name:'대시보드', ic:'◎'},
   {id:'assets', name:'자산', ic:'▤'},
+  {id:'alloc', name:'배분', ic:'◫'},
   {id:'flow', name:'현금흐름', ic:'⇄'},
   {id:'sim', name:'시뮬레이션', ic:'↗'},
   {id:'todo', name:'체크리스트', ic:'✓'}
 ];
+var BUCKETS = {reserve:'① 생활 예비', gap:'② 공백 대비', growth:'③ 성장'};
+var BUCKET_DESC = {reserve:'비상금·교육비 — 예금·MMF', gap:'소득이 생활비보다 적은 기간용 — 공제회 → 예금·단기채', growth:'나머지 전부 — 지수 ETF (비중은 리밸런서)'};
+var BUCKET_COLOR = {reserve:'var(--c5)', gap:'var(--c2)', growth:'var(--c0)'};
+function defaultBucket(cat){ return cat === 'cash' ? 'reserve' : (FIN_CATS.indexOf(cat) >= 0 ? 'growth' : ''); }
 var LS_DATA = 'cf_data', LS_SNAPS = 'cf_snaps', LS_META = 'cf_meta';
 
 function defaultData(){
@@ -128,7 +133,10 @@ function defaultData(){
     members:[{name:'본인', email:''},{name:'아내', email:''}],
     assets:[], debts:[], incomes:[], lumps:[],
     sim:{rate:5, lifeStart:'2033-01', saveBefore:0, spend:500, endYear:2060},
-    checklist:[]
+    checklist:[],
+    buckets:{reserve:{target:null}, gap:{target:null}},
+    moves:[],          // 버킷 이동 계획 {id, month, text, done}
+    rbMap:{}           // 리밸런서 계좌 이름 → 자산 id ('' = 제외)
   };
 }
 
@@ -146,6 +154,11 @@ function normalize(d){
   var def = defaultData();
   ['members','assets','debts','incomes','lumps','checklist'].forEach(function(k){ if(!Array.isArray(d[k])) d[k] = def[k]; });
   d.sim = Object.assign({}, def.sim, d.sim || {});
+  if(!Array.isArray(d.moves)) d.moves = [];
+  if(!d.rbMap || typeof d.rbMap !== 'object') d.rbMap = {};
+  d.buckets = d.buckets || {};
+  ['reserve','gap'].forEach(function(k){ d.buckets[k] = Object.assign({target:null}, d.buckets[k] || {}); });
+  d.assets.forEach(function(a){ if(a.bucket === undefined) a.bucket = defaultBucket(a.cat); delete a.rb; });
   d.version = 1;
   return d;
 }
@@ -285,7 +298,7 @@ function render(){
     return '<button class="'+(t.id===TAB?'on':'')+'" onclick="go(\''+t.id+'\')"><span class="ic">'+t.ic+'</span>'+t.name+'</button>';
   }).join('');
   var v = document.getElementById('view');
-  v.innerHTML = ({dash:viewDash, assets:viewAssets, flow:viewFlow, sim:viewSim, todo:viewTodo}[TAB] || viewDash)();
+  v.innerHTML = ({dash:viewDash, assets:viewAssets, alloc:viewAlloc, flow:viewFlow, sim:viewSim, todo:viewTodo}[TAB] || viewDash)();
 }
 function go(t){ TAB = t; localStorage.setItem('cf_tab', t); render(); window.scrollTo(0,0); }
 
@@ -321,11 +334,11 @@ function viewAssets(){
     h += '<div class="grp"><span>'+CATS[c]+'</span><span class="num">'+fm(t.byCat[c])+'</span></div>';
     list.forEach(function(a){
       h += '<div class="row" onclick="editAsset(\''+a.id+'\')"><div class="m"><div class="t">'+esc(a.name)+
-        (a.owner ? '<span class="tag">'+esc(a.owner)+'</span>' : '')+(a.rb ? '<span class="tag">리밸런서</span>' : '')+'</div>'+
+        (a.owner ? '<span class="tag">'+esc(a.owner)+'</span>' : '')+(a.bucket ? '<span class="tag">'+BUCKETS[a.bucket].slice(0,1)+'</span>' : '')+(isRbAsset(a.id) ? '<span class="tag">리밸런서</span>' : '')+'</div>'+
         (a.note ? '<div class="tiny">'+esc(a.note)+'</div>' : '')+'</div><div class="v">'+fm(num(a.value))+'</div></div>';
     });
   });
-  if(S.assets.some(function(a){ return a.rb; })) h += '<div class="btns"><button class="btn sub sm" onclick="syncRebalancer()">↻ 리밸런서에서 주식 평가액 불러오기</button></div>';
+  if(S.assets.length) h += '<div class="btns"><button class="btn sub sm" onclick="syncRebalancer()">↻ 리밸런서에서 불러오기</button><button class="btn sub sm" onclick="openRbMap()">리밸런서 계좌 연결</button></div>';
   h += '</div>';
   h += '<div class="card"><h2>부채<span class="sp"></span><button class="btn sm" onclick="editDebt()">+ 추가</button></h2>';
   if(!S.debts.length) h += '<div class="empty">전세보증금·대출 등을 기록합니다</div>';
@@ -362,7 +375,7 @@ function viewFlow(){
   if(!S.lumps.length) h += '<div class="empty">퇴직수당·적금 만기·교육비 같은 일회성 입출금</div>';
   S.lumps.slice().sort(function(a,b){ return (a.month||'').localeCompare(b.month||''); }).forEach(function(x){
     var a = num(x.amount);
-    h += '<div class="row" onclick="editLump(\''+x.id+'\')"><div class="m"><div class="t">'+esc(x.name)+'</div><div class="tiny">'+ymDot(x.month)+(x.note?' · '+esc(x.note):'')+'</div></div><div class="v '+(a<0?'neg':'pos')+'">'+(a>=0?'+':'')+fm(a)+'</div></div>';
+    h += '<div class="row" onclick="editLump(\''+x.id+'\')"><div class="m"><div class="t">'+esc(x.name)+'</div><div class="tiny">'+ymDot(x.month)+(x.bucket?' · '+BUCKETS[x.bucket]:'')+(x.note?' · '+esc(x.note):'')+'</div></div><div class="v '+(a<0?'neg':'pos')+'">'+(a>=0?'+':'')+fm(a)+'</div></div>';
   });
   h += '</div>';
   return h;
@@ -426,12 +439,14 @@ function editAsset(id){
     '<label class="f">명의<select id="f_owner">'+ownerOptions(a.owner)+'</select></label>'+
     '<label class="f">평가액 (만원)<input id="f_value" type="number" inputmode="decimal" value="'+esc(a.value)+'"></label>'+
     '<label class="f">메모<input id="f_note" value="'+esc(a.note)+'"></label>'+
-    '<label class="chk"><input type="checkbox" id="f_rb" '+(a.rb?'checked':'')+'> 리밸런서 총액으로 자동 갱신 (주식)</label>'+
+    '<label class="f">버킷<select id="f_bucket">'+bucketOptions(id ? a.bucket : null)+'</select></label>'+
+    (id && isRbAsset(id) ? '<div class="tiny" style="margin-bottom:10px">리밸런서 계좌와 연결됨 — 평가액은 불러오기로 갱신</div>' : '')+
     '<div class="btns"><button class="btn" onclick="saveAsset(\''+(id||'')+'\')">저장</button><button class="btn sub" onclick="closeModal()">취소</button>'+
     (id?'<span style="flex:1"></span><button class="btn bad" onclick="delItem(\'assets\',\''+id+'\')">삭제</button>':'')+'</div>');
 }
 function saveAsset(id){
-  var o = {name:fv('f_name').trim()||'이름 없음', cat:fv('f_cat'), owner:fv('f_owner'), value:num(fv('f_value')), note:fv('f_note').trim(), rb:document.getElementById('f_rb').checked};
+  var o = {name:fv('f_name').trim()||'이름 없음', cat:fv('f_cat'), owner:fv('f_owner'), value:num(fv('f_value')), note:fv('f_note').trim(), bucket:fv('f_bucket')};
+  if(o.bucket === 'auto') o.bucket = defaultBucket(o.cat);
   upsertItem('assets', id, o);
 }
 function editDebt(id){
@@ -460,8 +475,9 @@ function editLump(id){
     '<label class="f">이름<input id="f_name" value="'+esc(x.name)+'" placeholder="예: 퇴직수당"></label>'+
     '<label class="f">금액 (만원, 지출은 −)<input id="f_amount" type="number" inputmode="decimal" value="'+esc(x.amount)+'"></label>'+
     '<label class="f">시기<input id="f_month" type="month" value="'+esc(x.month)+'"></label>'+
+    '<label class="f">들어갈 버킷 (배분 탭 예정액에 반영)<select id="f_bucket">'+bucketOptions(x.bucket || '', true)+'</select></label>'+
     '<label class="f">메모<input id="f_note" value="'+esc(x.note)+'"></label>'+
-    '<div class="btns"><button class="btn" onclick="upsertItem(\'lumps\',\''+(id||'')+'\',{name:fv(\'f_name\').trim()||\'목돈\',amount:num(fv(\'f_amount\')),month:fv(\'f_month\'),note:fv(\'f_note\').trim()})">저장</button><button class="btn sub" onclick="closeModal()">취소</button>'+
+    '<div class="btns"><button class="btn" onclick="upsertItem(\'lumps\',\''+(id||'')+'\',{name:fv(\'f_name\').trim()||\'목돈\',amount:num(fv(\'f_amount\')),month:fv(\'f_month\'),bucket:fv(\'f_bucket\'),note:fv(\'f_note\').trim()})">저장</button><button class="btn sub" onclick="closeModal()">취소</button>'+
     (id?'<span style="flex:1"></span><button class="btn bad" onclick="delItem(\'lumps\',\''+id+'\')">삭제</button>':'')+'</div>');
 }
 function upsertItem(list, id, o){
@@ -483,7 +499,7 @@ function openSettings(){
          (_otpEmail ? '<label class="f">'+esc(_otpEmail)+' 로 보낸 코드<input id="f_code" inputmode="numeric" maxlength="6" autocomplete="one-time-code"></label><div class="btns"><button class="btn" onclick="verifyCode()">확인</button><button class="btn sub" onclick="_otpEmail=\'\';openSettings()">다시 입력</button></div>'
           : '<label class="f">이메일<input id="f_email" type="email" autocomplete="email"></label><div class="btns"><button class="btn" onclick="sendCode()">코드 받기</button></div>')))+
     '</div>'+
-    '<div class="card"><h2>가족 구성원</h2><div class="tiny" style="margin-bottom:8px">명의 표시와 리밸런서 연동(로그인 이메일 → 주식 자산 명의)에 씁니다</div>'+
+    '<div class="card"><h2>가족 구성원</h2><div class="tiny" style="margin-bottom:8px">자산·소득의 명의 표시에 씁니다</div>'+
     S.members.map(function(m,i){ return '<div class="grid2"><label class="f">이름<input id="m_n'+i+'" value="'+esc(m.name)+'"></label><label class="f">로그인 이메일<input id="m_e'+i+'" type="email" value="'+esc(m.email)+'"></label></div>'; }).join('')+
     '<div class="btns"><button class="btn sub sm" onclick="saveMembers()">구성원 저장</button></div></div>'+
     '<div class="card"><h2>데이터</h2><div class="btns" style="margin-top:0"><button class="btn sub" onclick="exportData()">내보내기 (JSON)</button><button class="btn sub" onclick="document.getElementById(\'file\').click()">가져오기</button></div>'+
@@ -631,22 +647,144 @@ async function cloudPull(manual){
   }
 }
 
-/* ── 리밸런서 연동: 로그인한 사람의 최신 자산 총액(원)을 읽어 그 사람 명의 주식 자산에 반영 ── */
-async function syncRebalancer(){
-  if(!sb || !_user){ alert('⚙ 설정에서 리밸런서와 같은 이메일로 로그인하세요'); return; }
-  var r = await sb.from('rebalancer_data').select('history,updated_at').eq('user_id', _user.id).maybeSingle();
-  if(r.error){ alert('리밸런서 데이터를 읽지 못했습니다: ' + r.error.message); return; }
+/* ── 리밸런서 연동: 계좌별로 자산에 연결 (주식 계좌 → 주식, 연금저축 계좌 → 연금저축 …) ── */
+var _rbLast = null;   // {date, accounts:{이름:{value}}}  — 로그인한 사람의 리밸런서 최신 기록
+function isRbAsset(id){ return Object.keys(S.rbMap).some(function(k){ return S.rbMap[k] === id; }); }
+async function fetchRebalancer(){
+  if(!sb || !_user){ alert('⚙ 설정에서 리밸런서와 같은 이메일로 로그인하세요'); return null; }
+  var r = await sb.from('rebalancer_data').select('history').eq('user_id', _user.id).maybeSingle();
+  if(r.error){ alert('리밸런서 데이터를 읽지 못했습니다: ' + r.error.message); return null; }
   var h = (r.data && r.data.history) || {}, keys = Object.keys(h).sort();
-  if(!keys.length){ alert('리밸런서에 자산 기록이 없습니다. 리밸런서에서 시세 조회 후 동기화하세요.'); return; }
-  var last = keys[keys.length-1], man = Math.round(num(h[last].total) / 10000);
-  var me = S.members.find(function(m){ return m.email && m.email === _user.email.toLowerCase(); });
-  var targets = S.assets.filter(function(a){ return a.rb && (!me || !a.owner || a.owner === me.name); });
-  if(!targets.length) targets = S.assets.filter(function(a){ return a.rb; });
-  if(targets.length !== 1){ alert('리밸런서 연동 자산이 '+targets.length+'개입니다. 내 명의 주식 자산 하나만 연동으로 표시하세요.'); return; }
-  var a = targets[0], old = num(a.value);
-  a.value = man; a.note = '리밸런서 ' + last + ' 기준';
-  commit(); toast(a.name + ' ' + fm(old) + ' → ' + fm(man));
+  if(!keys.length){ alert('리밸런서에 자산 기록이 없습니다. 리밸런서에서 시세 조회 후 동기화하세요.'); return null; }
+  var last = keys[keys.length-1];
+  _rbLast = {date:last, accounts:h[last].accounts || {}};
+  return _rbLast;
 }
+async function openRbMap(){
+  var rb = await fetchRebalancer(); if(!rb) return;
+  var names = Object.keys(rb.accounts);
+  var opts = function(sel){ return '<option value="">연결 안 함</option>' + S.assets.filter(function(a){ return FIN_CATS.indexOf(a.cat) >= 0; }).map(function(a){
+    return '<option value="'+a.id+'" '+(a.id===sel?'selected':'')+'>'+esc(a.name)+(a.owner?' ('+esc(a.owner)+')':'')+'</option>'; }).join(''); };
+  openModal('<h3>리밸런서 계좌 연결</h3><div class="tiny" style="margin-bottom:12px">'+esc(rb.date)+' 기록 기준. 계좌마다 캐시플로우 자산을 고르면, 같은 자산에 연결된 계좌들의 평가액 합계가 그 자산 금액이 됩니다.</div>'+
+    names.map(function(n,i){ return '<label class="f">'+esc(n)+' <span class="num">'+fm(num(rb.accounts[n].value)/10000)+'</span><select id="rbm'+i+'">'+opts(S.rbMap[n])+'</select></label>'; }).join('')+
+    '<div class="btns"><button class="btn" onclick="saveRbMap()">저장하고 불러오기</button><button class="btn sub" onclick="closeModal()">취소</button></div>');
+}
+function saveRbMap(){
+  Object.keys(_rbLast.accounts).forEach(function(n,i){ S.rbMap[n] = fv('rbm'+i); });
+  closeModal(); applyRebalancer();
+}
+async function syncRebalancer(){
+  var rb = await fetchRebalancer(); if(!rb) return;
+  var unmapped = Object.keys(rb.accounts).filter(function(n){ return !(n in S.rbMap); });
+  if(unmapped.length){ toast('연결 안 된 계좌가 있어 연결 화면을 엽니다'); openRbMap(); return; }
+  applyRebalancer();
+}
+function applyRebalancer(){
+  var rb = _rbLast, sums = {}, msgs = [];
+  Object.keys(rb.accounts).forEach(function(n){ var id = S.rbMap[n]; if(id) sums[id] = (sums[id]||0) + num(rb.accounts[n].value); });
+  Object.keys(sums).forEach(function(id){
+    var a = S.assets.find(function(x){ return x.id === id; }); if(!a) return;
+    var man = Math.round(sums[id]/10000);
+    if(man !== num(a.value)) msgs.push(a.name + ' ' + fm(num(a.value)) + '→' + fm(man));
+    a.value = man; a.note = '리밸런서 ' + rb.date + ' 기준';
+  });
+  commit(); toast(msgs.length ? msgs.join(', ') : '변동 없음 (' + rb.date + ')');
+}
+
+/* ════════ 배분 (버킷) ════════ */
+function bucketOptions(sel, forLump){
+  var o = forLump ? '<option value="">지정 안 함</option>' : (sel == null ? '<option value="auto" selected>분류에 맞춰 자동</option>' : '') + '<option value="" '+(sel===''?'selected':'')+'>없음 (부동산 등)</option>';
+  return o + Object.keys(BUCKETS).map(function(k){ return '<option value="'+k+'" '+(k===sel?'selected':'')+'>'+BUCKETS[k]+'</option>'; }).join('');
+}
+// 생활비 시작 이후 '소득 < 생활비' 첫 구간 (공백기)
+function gapRun(){
+  var life = ymIdx(S.sim.lifeStart), start = Math.max(nowIdx(), life == null ? nowIdx() : life), end = num(S.sim.endYear)*12 + 11, sp = num(S.sim.spend);
+  var run = null;
+  for(var i = start; i <= end; i++){
+    var short = sp - incomeAt(i);
+    if(short > 0){ if(!run) run = {from:i, to:i, total:0}; run.to = i; run.total += short; }
+    else if(run) break;
+  }
+  if(run) run.endless = run.to === end;
+  return run;
+}
+function bucketTargets(){
+  var run = gapRun();
+  var rT = S.buckets.reserve.target, gT = S.buckets.gap.target;
+  return {
+    reserve: rT != null && rT !== '' ? num(rT) : num(S.sim.spend)*6,
+    reserveAuto: !(rT != null && rT !== ''),
+    gap: gT != null && gT !== '' ? num(gT) : (run && !run.endless ? Math.round(run.total) : 0),
+    gapAuto: !(gT != null && gT !== ''),
+    run: run
+  };
+}
+function viewAlloc(){
+  var bt = bucketTargets(), run = bt.run, cur = {}, planned = {}, now = nowIdx();
+  Object.keys(BUCKETS).forEach(function(k){ cur[k] = 0; planned[k] = []; });
+  S.assets.forEach(function(a){ if(a.bucket && cur[a.bucket] != null) cur[a.bucket] += num(a.value); });
+  S.lumps.forEach(function(l){ var i = ymIdx(l.month); if(l.bucket && planned[l.bucket] && i != null && i >= now && (!run || l.bucket !== 'gap' || i < run.from)) planned[l.bucket].push(l); });
+  var fin = cur.reserve + cur.gap + cur.growth;
+  var parts = Object.keys(BUCKETS).filter(function(k){ return cur[k] > 0; }).map(function(k){ return {n:BUCKETS[k], v:cur[k], c:BUCKET_COLOR[k]}; });
+  var h = '<div class="card"><h2>버킷 3개</h2>'+donut(parts)+'<div class="tiny" style="margin-top:8px">버킷은 자산 탭에서 자산마다 지정합니다. 부동산은 버킷에 넣지 않습니다.</div></div>';
+
+  if(run){
+    h += '<div class="alert">'+(run.endless
+      ? '생활비 시작 뒤로 <b>소득이 생활비보다 계속 적습니다</b>. 공백 버킷 대신 성장 버킷에서 매년 꺼내 쓰는 구조입니다. 생활비를 다시 확인하세요.'
+      : '<b>공백기 '+ymDot(idxYm(run.from))+'~'+ymDot(idxYm(run.to))+'</b> ('+(run.to-run.from+1)+'개월): 월 평균 '+fm(run.total/(run.to-run.from+1))+'씩, 합계 <b>'+fm(run.total)+'</b>이 모자랍니다.')+'</div>';
+  }
+
+  ['reserve','gap','growth'].forEach(function(k){
+    var c = cur[k], pl = sum(planned[k], function(l){ return num(l.amount); });
+    h += '<div class="card"><h2><span style="color:'+BUCKET_COLOR[k]+'">●</span> '+BUCKETS[k]+'<span class="sp"></span>'+(k!=='growth'?'<button class="btn sub sm" onclick="editTarget(\''+k+'\')">목표</button>':'')+'</h2>'+
+      '<div class="tiny" style="margin-bottom:10px">'+BUCKET_DESC[k]+'</div>';
+    if(k === 'growth'){
+      h += '<div class="grid2"><div class="kv"><div class="k">현재</div><div class="v">'+fm(c)+'</div></div><div class="kv"><div class="k">금융자산 중 비중</div><div class="v">'+(fin?Math.round(c/fin*100):0)+'%</div></div></div>';
+    } else {
+      var t = k==='reserve' ? bt.reserve : bt.gap, auto = k==='reserve' ? bt.reserveAuto : bt.gapAuto;
+      var after = c + pl, ok = after >= t, pct = t ? Math.min(100, Math.round(after/t*100)) : 100;
+      h += '<div class="grid2">'+
+        '<div class="kv"><div class="k">목표'+(auto?' (자동)':'')+'</div><div class="v">'+fm(t)+'</div></div>'+
+        '<div class="kv"><div class="k">현재'+(pl?' + 예정':'')+'</div><div class="v">'+fm(c)+(pl?' <span class="tiny">+'+fm(pl)+'</span>':'')+'</div></div></div>'+
+        '<div style="height:8px;background:var(--s3);border-radius:99px;margin:10px 0 6px;overflow:hidden"><div style="height:100%;width:'+pct+'%;background:'+(ok?'var(--good)':'var(--warn)')+'"></div></div>'+
+        '<div class="tiny '+(ok?'pos':'wrn')+'">'+(t===0?'목표 없음':ok?'목표 충족'+(after-t>0?' · 여유 '+fm(after-t):''):'부족 '+fm(t-after))+'</div>';
+      if(auto) h += '<div class="tiny" style="margin-top:4px">'+(k==='reserve'?'자동 = 월 생활비 6개월치. 교육비를 더하려면 [목표]에서 직접 입력':'자동 = 현금흐름의 공백기 부족분 합계')+'</div>';
+    }
+    var list = S.assets.filter(function(a){ return a.bucket === k; });
+    if(list.length) h += '<div style="margin-top:10px">'+list.map(function(a){ return '<div class="row" onclick="editAsset(\''+a.id+'\')"><div class="m"><div class="t">'+esc(a.name)+(a.owner?'<span class="tag">'+esc(a.owner)+'</span>':'')+'</div></div><div class="v">'+fm(num(a.value))+'</div></div>'; }).join('')+'</div>';
+    if(planned[k].length) h += planned[k].map(function(l){ return '<div class="row" onclick="editLump(\''+l.id+'\')"><div class="m"><div class="t">'+esc(l.name)+'<span class="tag">예정 '+ymDot(l.month)+'</span></div></div><div class="v pos">+'+fm(num(l.amount))+'</div></div>'; }).join('');
+    h += '</div>';
+  });
+
+  // 이동 계획: 공백기 직전 자동 항목 + 직접 입력 항목
+  var items = S.moves.map(function(m){ return {id:m.id, month:m.month, text:m.text, done:m.done}; });
+  if(run && !run.endless) items.push({auto:true, month:idxYm(run.from - 1), text:'② 공백 대비 자금 '+fm(bt.gap)+'을 예금·단기채로 옮기기 ('+ymDot(idxYm(run.from))+'부터 매달 꺼내 씀)'});
+  items.sort(function(a,b){ return (a.month||'').localeCompare(b.month||''); });
+  h += '<div class="card"><h2>이동 계획<span class="sp"></span><button class="btn sm" onclick="editMove()">+ 추가</button></h2>';
+  if(!items.length) h += '<div class="empty">버킷 사이에서 돈을 옮길 일정을 적어 둡니다</div>';
+  items.forEach(function(m){
+    var i = ymIdx(m.month), soon = !m.done && i != null && i - now <= 12 && i >= now, past = !m.done && i != null && i < now;
+    h += '<div class="chk-item '+(m.done?'done':'')+'">'+(m.auto?'<span style="width:22px;text-align:center" class="tiny">자동</span>':'<input type="checkbox" '+(m.done?'checked':'')+' onchange="toggleMove(\''+m.id+'\')">')+
+      '<div class="tx" '+(m.auto?'':'onclick="editMove(\''+m.id+'\')" style="cursor:pointer"')+'><div class="num tiny '+(past?'neg':soon?'wrn':'')+'">'+ymDot(m.month)+(soon?' · 1년 이내':past?' · 지남':'')+'</div>'+esc(m.text)+'</div></div>';
+  });
+  h += '</div>';
+  return h;
+}
+function editTarget(k){
+  var bt = bucketTargets(), cur = S.buckets[k].target;
+  openModal('<h3>'+BUCKETS[k]+' 목표</h3>'+
+    '<label class="f">목표 금액 (만원, 비우면 자동: '+fm(k==='reserve'?num(S.sim.spend)*6:(bt.run&&!bt.run.endless?bt.run.total:0))+')<input id="f_t" type="number" inputmode="decimal" value="'+(cur==null?'':esc(cur))+'"></label>'+
+    '<div class="btns"><button class="btn" onclick="S.buckets[\''+k+'\'].target=(fv(\'f_t\').trim()===\'\'?null:num(fv(\'f_t\')));closeModal();commit()">저장</button><button class="btn sub" onclick="closeModal()">취소</button></div>');
+}
+function editMove(id){
+  var m = S.moves.find(function(x){ return x.id === id; }) || {};
+  openModal('<h3>'+(id?'이동 계획 수정':'이동 계획 추가')+'</h3>'+
+    '<label class="f">시기<input id="f_month" type="month" value="'+esc(m.month)+'"></label>'+
+    '<label class="f">내용<input id="f_text" value="'+esc(m.text)+'" placeholder="예: 공제회(본인) 만기 → ③ 성장 ETF 매수"></label>'+
+    '<div class="btns"><button class="btn" onclick="upsertItem(\'moves\',\''+(id||'')+'\',{month:fv(\'f_month\'),text:fv(\'f_text\').trim()||\'이동\'})">저장</button><button class="btn sub" onclick="closeModal()">취소</button>'+
+    (id?'<span style="flex:1"></span><button class="btn bad" onclick="delItem(\'moves\',\''+id+'\')">삭제</button>':'')+'</div>');
+}
+function toggleMove(id){ var m = S.moves.find(function(x){ return x.id === id; }); if(m){ m.done = !m.done; commit(); } }
 
 /* ════════ 시작 ════════ */
 document.documentElement.dataset.theme = localStorage.getItem('cf_theme') || 'dark';
