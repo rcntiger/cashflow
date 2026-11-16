@@ -93,6 +93,9 @@ svg text{font-family:var(--mono)}
 .legend{display:flex;flex-wrap:wrap;gap:6px 14px;margin-top:8px;font-size:var(--f-xs);color:var(--t2)}
 .legend i{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:5px;vertical-align:-1px}
 .empty{color:var(--t2);font-size:var(--f-sm);padding:8px 2px}
+.chips{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px}
+.chip{border:1px solid var(--bd);background:var(--s1);color:var(--t2);border-radius:99px;padding:5px 12px;font-size:var(--f-sm);cursor:pointer}
+.chip.on{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:700}
 .alert{background:var(--s2);border-left:3px solid var(--warn);border-radius:8px;padding:10px;font-size:var(--f-sm);margin-bottom:10px}
 </style>
 </head>
@@ -100,6 +103,7 @@ svg text{font-family:var(--mono)}
 <header>
   <h1>캐시플로우</h1>
   <span id="cloud"></span>
+  <button class="hbtn" id="hideBtn" onclick="toggleHide()" aria-label="금액 숨김"></button>
   <button class="hbtn" onclick="openSettings()" aria-label="설정">⚙</button>
 </header>
 <main id="view"></main>
@@ -145,6 +149,8 @@ var S = loadLocal();
 var SNAPS = loadSnaps();           // { 'YYYY-MM': {net_worth,total_assets,total_debts,breakdown} }
 var META = loadMeta();             // { base: 서버 updated_at, dirty: bool }
 var TAB = localStorage.getItem('cf_tab') || 'dash';
+var HIDE = localStorage.getItem('cf_hide') === '1';     // 금액 숨김
+var OWNER = localStorage.getItem('cf_owner') || '';     // 명의 필터 ('' = 전체)
 
 function loadLocal(){
   try{ var d = JSON.parse(localStorage.getItem(LS_DATA)); if(d && d.version) return normalize(d); }catch(e){}
@@ -179,6 +185,7 @@ function uid(){ return Math.random().toString(36).slice(2,10); }
 function num(v){ var n = parseFloat(String(v).replace(/,/g,'')); return isFinite(n) ? n : 0; }
 // 금액 단위: 만원
 function fm(v){
+  if(HIDE) return '••••';
   var s = v < 0 ? '-' : ''; v = Math.abs(Math.round(v));
   if(v >= 10000){ return s + (Math.round(v/100)/100).toLocaleString('ko-KR') + '억'; }
   return s + v.toLocaleString('ko-KR') + '만';
@@ -192,12 +199,14 @@ function sum(a, f){ return a.reduce(function(s,x){ return s + (f ? f(x) : x); },
 function toast(msg){ var t = document.getElementById('toast'); t.textContent = msg; t.classList.add('on'); clearTimeout(toast._t); toast._t = setTimeout(function(){ t.classList.remove('on'); }, 2400); }
 
 /* ════════ 계산 ════════ */
-function totals(){
-  var assets = sum(S.assets, function(a){ return num(a.value); });
-  var debts = sum(S.debts, function(d){ return num(d.value); });
+function byOwner(list){ return OWNER ? list.filter(function(x){ return (x.owner || '') === OWNER; }) : list; }
+function totals(all){
+  var A = all ? S.assets : byOwner(S.assets), D = all ? S.debts : byOwner(S.debts);
+  var assets = sum(A, function(a){ return num(a.value); });
+  var debts = sum(D, function(d){ return num(d.value); });
   var byCat = {};
-  S.assets.forEach(function(a){ byCat[a.cat] = (byCat[a.cat]||0) + num(a.value); });
-  var fin = sum(S.assets.filter(function(a){ return FIN_CATS.indexOf(a.cat) >= 0; }), function(a){ return num(a.value); });
+  A.forEach(function(a){ byCat[a.cat] = (byCat[a.cat]||0) + num(a.value); });
+  var fin = sum(A.filter(function(a){ return FIN_CATS.indexOf(a.cat) >= 0; }), function(a){ return num(a.value); });
   return {assets:assets, debts:debts, net:assets-debts, byCat:byCat, fin:fin};
 }
 function incomeAt(i){
@@ -213,7 +222,7 @@ function lumpAt(i){
 function simulate(){
   var sim = S.sim, r = Math.pow(1 + num(sim.rate)/100, 1/12) - 1;
   var start = nowIdx(), end = num(sim.endYear)*12 + 11, life = ymIdx(sim.lifeStart) || start;
-  var bal = totals().fin, years = [], yNet = 0, yIn = 0, minV = bal, minI = start, firstNeg = null;
+  var bal = totals(true).fin, years = [], yNet = 0, yIn = 0, minV = bal, minI = start, firstNeg = null;
   for(var i = start; i <= end; i++){
     bal *= (1 + r);
     var inc = incomeAt(i);
@@ -224,7 +233,7 @@ function simulate(){
     if(bal < 0 && firstNeg == null) firstNeg = i;
     if(i % 12 === 11 || i === end){ years.push({y:Math.floor(i/12), bal:bal, net:yNet}); yNet = 0; yIn = 0; }
   }
-  return {years:years, minV:minV, minI:minI, firstNeg:firstNeg, start:totals().fin};
+  return {years:years, minV:minV, minI:minI, firstNeg:firstNeg, start:totals(true).fin};
 }
 // 월 소득이 같은 구간끼리 묶기
 function incomePeriods(){
@@ -278,11 +287,11 @@ function barChart(bars, line){
   var bw = (W-L-Rr) / bars.length;
   var Y = function(v){ return T + (H-T-B) * (1 - v/mx); };
   var g = '', k;
-  for(k = 0; k <= 4; k++){ var v = mx*k/4; g += '<line x1="'+L+'" x2="'+(W-Rr)+'" y1="'+Y(v)+'" y2="'+Y(v)+'" stroke="var(--bd)"/><text x="'+(L-6)+'" y="'+(Y(v)+4)+'" font-size="12" fill="var(--t2)" text-anchor="end">'+Math.round(v).toLocaleString()+'</text>'; }
+  for(k = 0; k <= 4; k++){ var v = mx*k/4; g += '<line x1="'+L+'" x2="'+(W-Rr)+'" y1="'+Y(v)+'" y2="'+Y(v)+'" stroke="var(--bd)"/><text x="'+(L-6)+'" y="'+(Y(v)+4)+'" font-size="12" fill="var(--t2)" text-anchor="end">'+(HIDE?'':Math.round(v).toLocaleString())+'</text>'; }
   var step = Math.max(1, Math.ceil(bars.length/8));
   bars.forEach(function(b,i){
     var x = L + bw*i + bw*0.15, w = bw*0.7, y = Y(b.v);
-    g += '<rect x="'+x+'" y="'+y+'" width="'+w+'" height="'+Math.max(0,(H-B)-y)+'" rx="2" fill="'+b.c+'"><title>'+esc(b.x)+': 월 '+Math.round(b.v).toLocaleString()+'만</title></rect>';
+    g += '<rect x="'+x+'" y="'+y+'" width="'+w+'" height="'+Math.max(0,(H-B)-y)+'" rx="2" fill="'+b.c+'"><title>'+esc(b.x)+': 월 '+fm(b.v)+'</title></rect>';
     if(i % step === 0) g += '<text x="'+(x+w/2)+'" y="'+(H-8)+'" font-size="12" fill="var(--t2)" text-anchor="middle">'+esc(b.x)+'</text>';
   });
   var lp = bars.map(function(b,i){ return b.line == null ? null : [L + bw*i + bw/2, Y(b.line)]; });
@@ -294,12 +303,19 @@ function barChart(bars, line){
 
 /* ════════ 화면 ════════ */
 function render(){
+  var hb = document.getElementById('hideBtn'); if(hb){ hb.textContent = HIDE ? '🙈' : '👁'; hb.title = HIDE ? '금액 보이기' : '금액 숨기기'; }
   document.getElementById('nav').innerHTML = TABS.map(function(t){
     return '<button class="'+(t.id===TAB?'on':'')+'" onclick="go(\''+t.id+'\')"><span class="ic">'+t.ic+'</span>'+t.name+'</button>';
   }).join('');
   var v = document.getElementById('view');
   v.innerHTML = ({dash:viewDash, assets:viewAssets, alloc:viewAlloc, flow:viewFlow, sim:viewSim, todo:viewTodo}[TAB] || viewDash)();
 }
+function ownerChips(){
+  var opts = [''].concat(S.members.map(function(m){ return m.name; }), ['공동']);
+  return '<div class="chips">' + opts.map(function(o){ return '<button class="chip '+(o===OWNER?'on':'')+'" onclick="setOwner(\''+esc(o)+'\')">'+(o?esc(o):'전체')+'</button>'; }).join('') + '</div>';
+}
+function setOwner(o){ OWNER = o; localStorage.setItem('cf_owner', o); render(); }
+function toggleHide(){ HIDE = !HIDE; localStorage.setItem('cf_hide', HIDE ? '1' : '0'); render(); }
 function go(t){ TAB = t; localStorage.setItem('cf_tab', t); render(); window.scrollTo(0,0); }
 
 function viewDash(){
@@ -309,9 +325,17 @@ function viewDash(){
   var pts = keys.map(function(k){ return {x:k.slice(2).replace('-','.'), y:num(SNAPS[k].net_worth)}; });
   var inc = incomeAt(nowIdx());
   var cm = thisMonth(), saved = !!SNAPS[cm];
-  var h = '';
+  var h = ownerChips();
+  // 전월 대비: 이번 달 이전의 가장 최근 기록과 비교 (가계 전체 기준)
+  var prevK = keys.filter(function(k){ return k < cm; }).pop(), delta = '';
+  if(!OWNER && prevK){
+    var pv = num(SNAPS[prevK].net_worth), d = t.net - pv, pct = pv ? d/Math.abs(pv)*100 : 0;
+    delta = '<div class="'+(d>=0?'pos':'neg')+'" style="font-size:var(--f-sm);margin-top:2px">'+ymDot(prevK)+' 대비 '+(d>=0?'+':'')+fm(d)+(HIDE?'':' ('+(d>=0?'+':'')+pct.toFixed(1)+'%)')+'</div>';
+  } else if(OWNER){
+    delta = '<div class="tiny" style="margin-top:2px">'+esc(OWNER)+' 명의만 · 추이와 기록은 가계 전체 기준</div>';
+  }
   if(!S.assets.length) h += '<div class="alert">아직 기록이 없습니다. <b>자산</b> 탭에서 입력하거나, ⚙ 설정에서 JSON 파일을 가져오세요.</div>';
-  h += '<div class="card"><div class="muted">순자산</div><div class="big num">'+fm(t.net)+'원</div>'+
+  h += '<div class="card"><div class="muted">순자산</div><div class="big num">'+fm(t.net)+(HIDE?'':'원')+'</div>'+delta+
     '<div class="grid2" style="margin-top:12px">'+
     '<div class="kv"><div class="k">총자산</div><div class="v">'+fm(t.assets)+'</div></div>'+
     '<div class="kv"><div class="k">부채</div><div class="v">'+fm(t.debts)+'</div></div>'+
@@ -326,10 +350,10 @@ function viewDash(){
 }
 
 function viewAssets(){
-  var t = totals(), h = '<div class="card"><h2>자산<span class="sp"></span><button class="btn sm" onclick="editAsset()">+ 추가</button></h2>';
-  if(!S.assets.length) h += '<div class="empty">아직 자산이 없습니다</div>';
+  var t = totals(), h = ownerChips() + '<div class="card"><h2>자산<span class="sp"></span><button class="btn sm" onclick="editAsset()">+ 추가</button></h2>';
+  if(!byOwner(S.assets).length) h += '<div class="empty">'+(OWNER?'이 명의의 자산이 없습니다':'아직 자산이 없습니다')+'</div>';
   Object.keys(CATS).forEach(function(c){
-    var list = S.assets.filter(function(a){ return a.cat === c; });
+    var list = byOwner(S.assets).filter(function(a){ return a.cat === c; });
     if(!list.length) return;
     h += '<div class="grp"><span>'+CATS[c]+'</span><span class="num">'+fm(t.byCat[c])+'</span></div>';
     list.forEach(function(a){
@@ -341,8 +365,8 @@ function viewAssets(){
   if(S.assets.length) h += '<div class="btns"><button class="btn sub sm" onclick="syncRebalancer()">↻ 리밸런서에서 불러오기</button><button class="btn sub sm" onclick="openRbMap()">리밸런서 계좌 연결</button></div>';
   h += '</div>';
   h += '<div class="card"><h2>부채<span class="sp"></span><button class="btn sm" onclick="editDebt()">+ 추가</button></h2>';
-  if(!S.debts.length) h += '<div class="empty">전세보증금·대출 등을 기록합니다</div>';
-  S.debts.forEach(function(d){
+  if(!byOwner(S.debts).length) h += '<div class="empty">전세보증금·대출 등을 기록합니다</div>';
+  byOwner(S.debts).forEach(function(d){
     h += '<div class="row" onclick="editDebt(\''+d.id+'\')"><div class="m"><div class="t">'+esc(d.name)+'</div>'+(d.note?'<div class="tiny">'+esc(d.note)+'</div>':'')+'</div><div class="v neg">−'+fm(num(d.value))+'</div></div>';
   });
   h += '</div><div class="card"><div class="grid2"><div class="kv"><div class="k">총자산</div><div class="v">'+fm(t.assets)+'</div></div><div class="kv"><div class="k">순자산</div><div class="v">'+fm(t.net)+'</div></div></div><div class="tiny" style="margin-top:8px">금액 단위는 만원입니다</div></div>';
@@ -453,9 +477,10 @@ function editDebt(id){
   var d = S.debts.find(function(x){ return x.id === id; }) || {};
   openModal('<h3>'+(id?'부채 수정':'부채 추가')+'</h3>'+
     '<label class="f">이름<input id="f_name" value="'+esc(d.name)+'" placeholder="예: 전세보증금"></label>'+
+    '<label class="f">명의<select id="f_owner">'+ownerOptions(d.owner)+'</select></label>'+
     '<label class="f">금액 (만원)<input id="f_value" type="number" inputmode="decimal" value="'+esc(d.value)+'"></label>'+
     '<label class="f">메모<input id="f_note" value="'+esc(d.note)+'"></label>'+
-    '<div class="btns"><button class="btn" onclick="upsertItem(\'debts\',\''+(id||'')+'\',{name:fv(\'f_name\').trim()||\'부채\',value:num(fv(\'f_value\')),note:fv(\'f_note\').trim()})">저장</button><button class="btn sub" onclick="closeModal()">취소</button>'+
+    '<div class="btns"><button class="btn" onclick="upsertItem(\'debts\',\''+(id||'')+'\',{name:fv(\'f_name\').trim()||\'부채\',owner:fv(\'f_owner\'),value:num(fv(\'f_value\')),note:fv(\'f_note\').trim()})">저장</button><button class="btn sub" onclick="closeModal()">취소</button>'+
     (id?'<span style="flex:1"></span><button class="btn bad" onclick="delItem(\'debts\',\''+id+'\')">삭제</button>':'')+'</div>');
 }
 function editIncome(id){
@@ -532,7 +557,7 @@ function importFile(inp){
 
 /* ════════ 스냅샷 ════════ */
 function saveSnapshot(){
-  var t = totals(), m = thisMonth();
+  var t = totals(true), m = thisMonth();
   if(SNAPS[m] && !confirm(ymDot(m)+' 기록을 지금 값으로 바꿀까요?')) return;
   SNAPS[m] = {net_worth:t.net, total_assets:t.assets, total_debts:t.debts, breakdown:t.byCat};
   localStorage.setItem(LS_SNAPS, JSON.stringify(SNAPS));
@@ -731,11 +756,11 @@ function bucketTargets(){
 function viewAlloc(){
   var bt = bucketTargets(), run = bt.run, cur = {}, planned = {}, now = nowIdx();
   Object.keys(BUCKETS).forEach(function(k){ cur[k] = 0; planned[k] = []; });
-  S.assets.forEach(function(a){ if(a.bucket && cur[a.bucket] != null) cur[a.bucket] += num(a.value); });
+  byOwner(S.assets).forEach(function(a){ if(a.bucket && cur[a.bucket] != null) cur[a.bucket] += num(a.value); });
   S.lumps.forEach(function(l){ var i = ymIdx(l.month); if(l.bucket && planned[l.bucket] && i != null && i >= now && (!run || l.bucket !== 'gap' || i < run.from)) planned[l.bucket].push(l); });
   var fin = cur.reserve + cur.gap + cur.growth;
   var parts = Object.keys(BUCKETS).filter(function(k){ return cur[k] > 0; }).map(function(k){ return {n:BUCKETS[k], v:cur[k], c:BUCKET_COLOR[k]}; });
-  var h = '<div class="card"><h2>버킷 3개</h2>'+donut(parts)+'<div class="tiny" style="margin-top:8px">버킷은 자산 탭에서 자산마다 지정합니다. 부동산은 버킷에 넣지 않습니다.</div></div>';
+  var h = ownerChips() + (OWNER ? '<div class="tiny" style="margin:-4px 2px 10px">목표 금액은 가계 전체 기준이라 명의별로 보면 부족해 보일 수 있습니다</div>' : '') + '<div class="card"><h2>버킷 3개</h2>'+donut(parts)+'<div class="tiny" style="margin-top:8px">버킷은 자산 탭에서 자산마다 지정합니다. 부동산은 버킷에 넣지 않습니다.</div></div>';
 
   if(run){
     h += '<div class="alert">'+(run.endless
@@ -759,7 +784,7 @@ function viewAlloc(){
         '<div class="tiny '+(ok?'pos':'wrn')+'">'+(t===0?'목표 없음':ok?'목표 충족'+(after-t>0?' · 여유 '+fm(after-t):''):'부족 '+fm(t-after))+'</div>';
       if(auto) h += '<div class="tiny" style="margin-top:4px">'+(k==='reserve'?'자동 = 월 생활비 6개월치. 교육비를 더하려면 [목표]에서 직접 입력':'자동 = 현금흐름의 공백기 부족분 합계')+'</div>';
     }
-    var list = S.assets.filter(function(a){ return a.bucket === k; });
+    var list = byOwner(S.assets).filter(function(a){ return a.bucket === k; });
     if(list.length) h += '<div style="margin-top:10px">'+list.map(function(a){ return '<div class="row" onclick="editAsset(\''+a.id+'\')"><div class="m"><div class="t">'+esc(a.name)+(a.owner?'<span class="tag">'+esc(a.owner)+'</span>':'')+'</div></div><div class="v">'+fm(num(a.value))+'</div></div>'; }).join('')+'</div>';
     if(planned[k].length) h += planned[k].map(function(l){ return '<div class="row" onclick="editLump(\''+l.id+'\')"><div class="m"><div class="t">'+esc(l.name)+'<span class="tag">예정 '+ymDot(l.month)+'</span></div></div><div class="v pos">+'+fm(num(l.amount))+'</div></div>'; }).join('');
     h += '</div>';
