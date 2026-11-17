@@ -165,7 +165,10 @@ function normalize(d){
   d.buckets = d.buckets || {};
   ['reserve','gap'].forEach(function(k){ d.buckets[k] = Object.assign({target:null}, d.buckets[k] || {}); });
   d.assets.forEach(function(a){ if(a.bucket === undefined) a.bucket = defaultBucket(a.cat); delete a.rb;
-    if(/^(리밸런서 .* 기준|실거래 중간값 .*)$/.test(a.note || '')){ a.src = a.note; a.note = ''; } });
+    if(/^(리밸런서 .* 기준|실거래 중간값 .*)$/.test(a.note || '')){ a.src = a.note; a.note = ''; }
+    var m1 = /^리밸런서 (\d{4})-(\d{2})-\d{2} 기준$/.exec(a.src || ''), m2 = /^실거래 중간값 (.*)$/.exec(a.src || '');
+    if(m1){ a.srcDetail = a.src.replace(' 기준',' 기록'); a.src = '리밸런서 적용 (' + (+m1[2]) + '월)'; }
+    if(m2){ a.srcDetail = '중간값 ' + m2[1]; a.src = '실거래가 적용'; } });
   d.version = 1;
   return d;
 }
@@ -463,6 +466,7 @@ function editAsset(id){
     '<label class="f">분류<select id="f_cat" onchange="document.getElementById(\'reBox\').style.display=this.value===\'realestate\'?\'block\':\'none\'">'+Object.keys(CATS).map(function(c){ return '<option value="'+c+'" '+(c===a.cat?'selected':'')+'>'+CATS[c]+'</option>'; }).join('')+'</select></label>'+
     '<label class="f">명의<select id="f_owner">'+ownerOptions(a.owner)+'</select></label>'+
     '<label class="f">평가액 (만원)<input id="f_value" type="number" inputmode="decimal" value="'+esc(a.value)+'"></label>'+
+    (a.src ? '<div class="tiny" style="margin:-4px 0 10px">'+esc(a.src)+(a.srcDetail?' · '+esc(a.srcDetail):'')+'</div>' : '')+
     '<label class="f">메모<input id="f_note" value="'+esc(a.note)+'"></label>'+
     '<label class="f">버킷<select id="f_bucket">'+bucketOptions(id ? a.bucket : null)+'</select></label>'+
     '<div id="reBox" style="display:'+(a.cat==='realestate'?'block':'none')+'"><div class="card" style="background:var(--s2)"><h2>시세 (아파트)</h2>'+
@@ -536,6 +540,7 @@ function openSettings(){
          (_otpEmail ? '<label class="f">'+esc(_otpEmail)+' 로 보낸 코드<input id="f_code" inputmode="numeric" maxlength="6" autocomplete="one-time-code"></label><div class="btns"><button class="btn" onclick="verifyCode()">확인</button><button class="btn sub" onclick="_otpEmail=\'\';openSettings()">다시 입력</button></div>'
           : '<label class="f">이메일<input id="f_email" type="email" autocomplete="email"></label><div class="btns"><button class="btn" onclick="sendCode()">코드 받기</button></div>')))+
     '</div>'+
+    (u ? '<div class="card"><h2>자동 갱신 (매월 1일 오전 9시)</h2><div class="tiny">부동산 실거래가, 리밸런서 평가액을 반영하고 그 달 순자산을 기록합니다</div><div class="btns"><button class="btn sub" onclick="runMonthly()">지금 실행</button></div></div>' : '')+
     '<div class="card"><h2>가족 구성원</h2><div class="tiny" style="margin-bottom:8px">자산·소득의 명의 표시에 씁니다</div>'+
     S.members.map(function(m,i){ return '<div class="grid2"><label class="f">이름<input id="m_n'+i+'" value="'+esc(m.name)+'"></label><label class="f">로그인 이메일<input id="m_e'+i+'" type="email" value="'+esc(m.email)+'"></label></div>'; }).join('')+
     '<div class="btns"><button class="btn sub sm" onclick="saveMembers()">구성원 저장</button></div></div>'+
@@ -650,6 +655,7 @@ async function resolveConflict(){
   if(r.error || !r.data) return;
   var who = r.data.updated_by || '다른 기기';
   if(_user && who.toLowerCase() === _user.email.toLowerCase()) who = '이 계정의 다른 기기';
+  if(/^auto/.test(who)) who = '자동 갱신(매월 1일)';
   if(confirm(who + ' 가 서버 장부를 먼저 바꿨습니다.\n\n확인: 서버 장부로 바꾸기 (이 기기의 최근 수정은 버림)\n취소: 이 기기 장부로 서버를 덮어쓰기')){
     applyServer(r.data);
   } else {
@@ -735,7 +741,7 @@ function applyRebalancer(){
     var a = S.assets.find(function(x){ return x.id === id; }); if(!a) return;
     var man = Math.round(sums[id]/10000);
     if(man !== num(a.value)) msgs.push(a.name + ' ' + fm(num(a.value)) + '→' + fm(man));
-    a.value = man; a.src = '리밸런서 ' + rb.date + ' 기준';
+    a.value = man; a.src = '리밸런서 적용 (' + (+rb.date.slice(5,7)) + '월)'; a.srcDetail = '리밸런서 ' + rb.date + ' 기록';
   });
   commit(); toast(msgs.length ? msgs.join(', ') : '변동 없음 (' + rb.date + ')');
 }
@@ -778,8 +784,29 @@ function applyTrade(){
   var a = S.assets.find(function(x){ return x.id === _trade.id; }); if(!a) return;
   var old = num(a.value);
   a.value = _trade.median;
-  a.src = '실거래 중간값 ' + _trade.items.length + '건 (' + _trade.from.slice(0,4)+'.'+_trade.from.slice(4) + '~' + _trade.to.slice(0,4)+'.'+_trade.to.slice(4) + ')';
+  a.src = '실거래가 적용 (' + (new Date().getMonth()+1) + '월)';
+  a.srcDetail = '중간값 ' + _trade.items.length + '건 · ' + _trade.from.slice(0,4)+'.'+_trade.from.slice(4) + '~' + _trade.to.slice(0,4)+'.'+_trade.to.slice(4);
   closeModal(); commit(); toast(a.name + ' ' + fm(old) + ' → ' + fm(a.value));
+}
+
+/* ── 매월 자동 갱신 (Edge Function cashflow-monthly) 수동 실행 ── */
+async function runMonthly(){
+  if(!sb || !_user) return;
+  if(META.dirty){ await cloudPush(); if(META.dirty){ alert('먼저 이 기기 장부를 서버에 저장하지 못했습니다. 잠시 뒤 다시 시도하세요.'); return; } }
+  openModal('<h3>자동 갱신</h3><div class="empty">부동산 시세와 리밸런서 값을 반영하는 중… (최대 1분)</div>');
+  var r = await sb.functions.invoke('cashflow-monthly', {body:{}, headers:{'x-region':'ap-northeast-2'}});
+  var d = r.data || {};
+  if(r.error || !d.ok){
+    openModal('<h3>자동 갱신 실패</h3><div class="alert">'+esc(d.message || (r.error && r.error.message) || '알 수 없는 오류')+'</div><div class="tiny">cashflow-monthly 배포와 Secret 등록을 확인하세요 (README)</div><div class="btns"><button class="btn sub" onclick="closeModal()">닫기</button></div>');
+    return;
+  }
+  var line = function(x){ return '<tr><td>'+esc(x.name)+'</td><td>'+(x.skipped ? esc(x.skipped) : fm(x.old)+' → '+fm(x.value))+'</td></tr>'; };
+  var h = '<h3>자동 갱신 완료</h3><table><tr><th>자산</th><th>변경</th></tr>'+d.realestate.concat(d.rebalancer).map(line).join('')+'</table>'+
+    '<div class="tiny" style="margin-top:8px">'+(d.snapshot ? ymDot(d.month)+' 순자산 기록 저장' : ymDot(d.month)+' 기록은 이미 있어 그대로 둠')+'</div>'+
+    (d.errors.length ? '<div class="alert" style="margin-top:8px">'+d.errors.map(esc).join('<br>')+'</div>' : '')+
+    '<div class="btns"><button class="btn" onclick="closeModal()">확인</button></div>';
+  openModal(h);
+  await cloudPull();
 }
 
 /* ════════ 배분 (버킷) ════════ */

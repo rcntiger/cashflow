@@ -43,3 +43,14 @@
    - 또는 CLI: `supabase functions deploy realestate-proxy --project-ref rcwneqlwzfplvrihvzyu`
 
 시군구 코드는 [법정동코드 조회](https://www.code.go.kr/stdcode/regCodeL.do)에서 법정동코드 앞 5자리입니다.
+
+## 매월 1일 자동 갱신 (선택)
+
+매월 1일 오전 9시(한국 시간)에 서버가 ① 부동산 실거래가 중간값 ② 리밸런서 최신 기록(계좌 연결대로) 을 장부에 반영하고 ③ 그 달 순자산 기록을 남깁니다. 앱 ⚙ 설정의 **지금 실행**으로 바로 돌려 볼 수 있습니다.
+
+리밸런서 값은 리밸런서에 마지막으로 저장된 기록입니다. 월말에 리밸런서에서 시세 조회를 한 번 해 두면 1일 값이 정확합니다.
+
+설정 (한 번만):
+1. Edge Function `cashflow-monthly` 배포 (`supabase/functions/cashflow-monthly/index.ts`)
+2. Secrets 에 `CRON_SECRET` 추가 — 임의의 긴 문자열 (`DATA_GO_KR_KEY`, `OWNER_EMAIL` 은 기존 값 사용)
+3. SQL Editor 에서 `supabase/cashflow_cron.sql` 의 `CRON_SECRET_값` 을 2번 값으로 바꿔 Run
