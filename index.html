@@ -71,7 +71,7 @@ table{width:100%;border-collapse:collapse;font-size:var(--f-sm)}
 th,td{padding:7px 4px;border-top:1px solid var(--bd);text-align:right}
 th:first-child,td:first-child{text-align:left}
 th{color:var(--t2);font-weight:500;font-size:var(--f-xs)}
-td{font-family:var(--mono)}
+td{font-family:var(--mono);white-space:nowrap}
 label.f{display:block;margin-bottom:10px;font-size:var(--f-sm);color:var(--t2)}
 label.f input,label.f select{display:block;width:100%;margin-top:4px;padding:10px;border-radius:10px;border:1px solid var(--bd);background:var(--s2);color:var(--t1);font-size:var(--f-md)}
 label.chk{display:flex;align-items:center;gap:8px;margin-bottom:10px;font-size:var(--f-sm)}
@@ -371,6 +371,31 @@ function ownerChips(){
 }
 function setOwner(o){ OWNER = o; localStorage.setItem('cf_owner', o); render(); }
 function toggleHide(){ HIDE = !HIDE; localStorage.setItem('cf_hide', HIDE ? '1' : '0'); render(); }
+// 이번 달 소득: 급여 장부에 이번 달 금액이 있으면 그 값(+ 이번 달 수당), 없으면 근로소득 항목 + 그 밖의 소득 항목
+function monthIncome(i){
+  var y = Math.floor(i/12), m = i%12, v = 0, fromLedger = [];
+  S.incomes.forEach(function(x){ if(!/^근로소득/.test(x.name) && expActiveInc(x, i)) v += num(x.monthly); });
+  S.members.forEach(function(mb){
+    var P = (S.salary[y] || {})[mb.name], pay = P && P.months ? Math.floor(num(P.months[m]) + 1e-9) : 0;
+    if(pay > 0){
+      v += pay + sum(allExtras(y, P).filter(function(e){ return num(e.month) === m+1; }), function(e){ return Math.floor(num(e.amount) + 1e-9); });
+      fromLedger.push(mb.name);
+    } else {
+      var w = S.incomes.find(function(x){ return /^근로소득/.test(x.name) && x.owner === mb.name && expActiveInc(x, i); });
+      if(w) v += num(w.monthly);
+    }
+  });
+  return {v:v, src: fromLedger.length ? '급여 장부' + (fromLedger.length < S.members.length ? ' + 소득 항목' : '') : '소득 항목 기준'};
+}
+// 순자산 카드: 자산군 색 막대 + 부채 막대 + 범례
+function assetBar(t){
+  if(t.assets <= 0) return '';
+  var cats = Object.keys(CATS).filter(function(c){ return t.byCat[c] > 0; });
+  var bar = cats.map(function(c){ return '<div title="'+CATS[c]+'" style="width:'+(t.byCat[c]/t.assets*100)+'%;background:'+CAT_COLOR[c]+'"></div>'; }).join('');
+  var debt = t.debts > 0 ? '<div style="display:flex;align-items:center;gap:8px;margin-top:6px"><div style="height:8px;border-radius:99px;width:'+Math.min(100, t.debts/t.assets*100)+'%;background:repeating-linear-gradient(45deg,var(--bad) 0 4px,transparent 4px 7px);border:1px solid var(--bad)"></div><span class="tiny neg" style="white-space:nowrap">부채 −'+fm(t.debts)+'</span></div>' : '';
+  var leg = cats.map(function(c){ return '<span style="white-space:nowrap"><i style="background:'+CAT_COLOR[c]+'"></i>'+CATS[c]+' <b class="num" style="color:var(--t1);font-weight:500">'+fm(t.byCat[c])+'</b></span>'; }).join('');
+  return '<div style="margin-top:14px"><div style="display:flex;height:14px;border-radius:99px;overflow:hidden;gap:2px">'+bar+'</div>'+debt+'<div class="legend">'+leg+'</div></div>';
+}
 function go(t){ TAB = t; localStorage.setItem('cf_tab', t); render(); window.scrollTo(0,0); }
 
 function viewDash(){
@@ -378,7 +403,7 @@ function viewDash(){
   var parts = Object.keys(CATS).filter(function(c){ return t.byCat[c] > 0; }).map(function(c){ return {n:CATS[c], v:t.byCat[c], c:CAT_COLOR[c]}; });
   var keys = Object.keys(SNAPS).sort();
   var pts = keys.map(function(k){ return {x:k.slice(2).replace('-','.'), y:num(SNAPS[k].net_worth)}; });
-  var inc = incomeAt(nowIdx());
+  var mi = monthIncome(nowIdx()), inc = mi.v;
   var cm = thisMonth(), saved = !!SNAPS[cm];
   var h = ownerChips();
   // 전월 대비: 이번 달 이전의 가장 최근 기록과 비교 (가계 전체 기준)
@@ -395,8 +420,8 @@ function viewDash(){
     '<div class="kv"><div class="k">총자산</div><div class="v">'+fm(t.assets)+'</div></div>'+
     '<div class="kv"><div class="k">부채</div><div class="v">'+fm(t.debts)+'</div></div>'+
     '<div class="kv"><div class="k">금융자산</div><div class="v">'+fm(t.fin)+'</div></div>'+
-    '<div class="kv"><div class="k">이번 달 소득 (입력 기준)</div><div class="v">'+fm(inc)+'</div></div>'+
-    '</div></div>';
+    '<div class="kv"><div class="k">이번 달 소득</div><div class="v">'+fm(inc)+'</div><div class="tiny">'+mi.src+'</div></div>'+
+    '</div>'+assetBar(t)+'</div>';
   h += '<div class="card"><h2>자산 비중</h2>'+donut(parts)+'</div>';
   h += '<div class="card"><h2>순자산 추이<span class="sp"></span><button class="btn sm '+(saved?'sub':'')+'" onclick="saveSnapshot()">'+(saved?'이번 달 다시 기록':'이번 달 기록')+'</button></h2>'+
     lineChart(pts, {zero:false, empty:'매달 한 번 [이번 달 기록]을 누르면 추이가 쌓입니다'})+
@@ -445,10 +470,13 @@ function viewFlow(){
   var h = viewTimeline() + '<div class="card"><h2>연도별 가계 월 소득</h2>'+barChart(bars)+
     '<div class="legend"><span><i style="background:var(--c1)"></i>월 소득 ≥ 생활비</span><span><i style="background:var(--warn)"></i>생활비보다 부족</span><span><i style="background:var(--bad)"></i>월 생활비 (점선)</span></div></div>';
   var per = incomePeriods();
-  h += '<div class="card"><h2>기간별 월 소득</h2><table><tr><th>기간</th><th>소득</th><th>생활비</th><th>차이</th></tr>';
+  // 모바일에서 줄바꿈되지 않게: 기간은 '26.11~32.12, 금액은 만원 단위 숫자만
+  var yy = function(i){ var s = idxYm(i); return s.slice(2,4)+'.'+s.slice(5); };
+  var nm = function(v){ return HIDE ? '••••' : Math.round(v).toLocaleString('ko-KR'); };
+  h += '<div class="card"><h2>기간별 월 소득<span class="sp"></span><span class="tiny">단위 만원</span></h2><table><tr><th>기간</th><th>소득</th><th>생활비</th><th>차이</th></tr>';
   per.forEach(function(p){
     var after = p.s != null, gap = after ? p.v - p.s : 0;
-    h += '<tr><td>'+ymDot(idxYm(p.from))+'~'+(p.to >= num(S.sim.endYear)*12+11 ? '' : ymDot(idxYm(p.to)))+'</td><td>'+fm(p.v)+'</td><td>'+(after ? fm(p.s) : '–')+'</td><td class="'+(after ? (gap<0?'neg':'pos') : '')+'">'+(after ? (gap>=0?'+':'')+fm(gap) : '–')+'</td></tr>';
+    h += '<tr><td>'+yy(p.from)+'~'+(p.to >= num(S.sim.endYear)*12+11 ? '' : yy(p.to))+'</td><td>'+nm(p.v)+'</td><td>'+(after ? nm(p.s) : '–')+'</td><td class="'+(after ? (gap<0?'neg':'pos') : '')+'">'+(after ? (gap>=0?'+':'')+nm(gap) : '–')+'</td></tr>';
   });
   h += '</table><div class="tiny" style="margin-top:6px">생활비는 생활비 시작('+ymDot(S.sim.lifeStart)+') 이후만 계산하고, 대출 이자·상환액을 포함합니다'+(S.sim.spendMode==='expenses'?' · 수입지출 탭의 고정지출 목록 기준':'')+'</div></div>';
   h += viewFamily();
