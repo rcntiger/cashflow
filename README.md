@@ -30,3 +30,16 @@
 - 허용된 두 이메일만 같은 장부(`household = 'home'`)를 읽고 쓸 수 있습니다 (RLS).
 - 두 사람이 거의 동시에 고치면 나중에 저장하는 쪽에 어느 장부를 남길지 묻습니다.
 - 리밸런서 연동: 로그인한 사람의 리밸런서 최신 기록을 **계좌별로** 읽어, 연결해 둔 자산에 넣습니다 (일반계좌 → 주식, 연금저축 계좌 → 연금저축 등). 같은 자산에 연결한 계좌는 합산합니다. 리밸런서 데이터는 읽기만 합니다.
+
+## 부동산 실거래가 (선택)
+
+아파트 자산에 시군구 코드·단지명·전용면적을 넣으면 국토교통부 실거래가에서 최근 6개월(없으면 12개월) 같은 면적 거래를 찾아 **중간값**을 보여 줍니다. [중간값으로 반영]을 눌러야 장부 금액이 바뀝니다. KB 시세는 단지 주소를 저장해 두고 바로가기로 엽니다.
+
+설정 (한 번만):
+1. [공공데이터포털](https://www.data.go.kr)에서 **국토교통부_아파트 매매 실거래가 자료** 활용 신청 → 마이페이지에서 일반 인증키(Decoding) 복사
+2. Supabase(personal-apps) → Edge Functions → Secrets 에 `DATA_GO_KR_KEY` = 위 키 추가 (`OWNER_EMAIL` 은 리밸런서 kis-proxy 에서 쓰는 값을 그대로 사용)
+3. `supabase/functions/realestate-proxy/index.ts` 를 `realestate-proxy` 이름으로 배포
+   - 대시보드: Edge Functions → Deploy a new function → 이름 `realestate-proxy` → 코드 붙여넣기 → Deploy
+   - 또는 CLI: `supabase functions deploy realestate-proxy --project-ref rcwneqlwzfplvrihvzyu`
+
+시군구 코드는 [법정동코드 조회](https://www.code.go.kr/stdcode/regCodeL.do)에서 법정동코드 앞 5자리입니다.
