@@ -95,6 +95,7 @@ svg text{font-family:var(--mono)}
 .empty{color:var(--t2);font-size:var(--f-sm);padding:8px 2px}
 .chips{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px}
 .chip{border:1px solid var(--bd);background:var(--s1);color:var(--t2);border-radius:99px;padding:5px 12px;font-size:var(--f-sm);cursor:pointer}
+.chip{white-space:nowrap;padding:5px 10px}
 .chip.on{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:700}
 .tblwrap{overflow-x:auto;-webkit-overflow-scrolling:touch}
 .tblwrap table{min-width:100%;white-space:nowrap}
@@ -924,9 +925,12 @@ function salStat(y, who){
 function salYears(){ var ys = Object.keys(S.salary).map(Number).filter(function(y){ return S.members.some(function(m){ return salStat(y, m.name); }); }); return ys.sort(); }
 function viewMoney(){
   var y = SAL_YEAR, years = salYears(), now = nowIdx(), cy = new Date().getFullYear();
+  // 연도 버튼: 선택 연도 앞뒤 1년씩 + ◀ ▶ 로 이동 (기록 있는 해는 점 표시)
   var chips = [];
-  for(var k = Math.min(cy-2, years[0]||cy); k <= cy+1; k++) chips.push(k);
-  var h = '<div class="chips">'+chips.map(function(k){ return '<button class="chip '+(k===y?'on':'')+'" onclick="SAL_YEAR='+k+';render()">'+k+'</button>'; }).join('')+'</div>';
+  for(var k = y-1; k <= y+1; k++) chips.push(k);
+  var h = '<div class="chips" style="flex-wrap:nowrap"><button class="chip" onclick="SAL_YEAR--;render()" aria-label="이전 연도">◀</button>'+
+    chips.map(function(k){ return '<button class="chip '+(k===y?'on':'')+'" onclick="SAL_YEAR='+k+';render()">'+k+(years.indexOf(k)>=0?' ·':'')+'</button>'; }).join('')+
+    '<button class="chip" onclick="SAL_YEAR++;render()" aria-label="다음 연도">▶</button>'+(y!==cy?'<button class="chip" onclick="SAL_YEAR='+cy+';render()">올해</button>':'')+'</div>';
   // 급여 장부
   var hh = 0;
   S.members.forEach(function(m){
