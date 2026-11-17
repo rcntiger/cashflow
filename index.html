@@ -915,10 +915,33 @@ var SAL_YEAR = new Date().getFullYear();
 function toMan(v){ var n = num(v); return Math.abs(n) >= 100000 ? Math.round(n/100)/100 : n; }
 function fmx(v){ return HIDE ? '••••' : (Math.round(v*10)/10).toLocaleString('ko-KR'); }
 function salOf(y, who){ var Y = S.salary[y] = S.salary[y] || {}; var P = Y[who] = Y[who] || {months:[], extras:[]}; if(!Array.isArray(P.months)) P.months = []; if(!Array.isArray(P.extras)) P.extras = []; return P; }
+// 급여는 만원 단위 절삭
+function manFloor(v){ return Math.floor(toMan(v) + 1e-9); }
+// 설·추석이 든 달 (명절휴가비 기본 지급 월 — 바꿀 수 있음)
+var HOLI = {2024:[2,9],2025:[1,10],2026:[2,9],2027:[2,9],2028:[1,10],2029:[2,9],2030:[2,9],2031:[1,10],2032:[2,9],2033:[1,9],2034:[2,9],2035:[2,9],2036:[1,10],2037:[2,9],2038:[2,9],2039:[1,10],2040:[2,9],2041:[2,9]};
+function autoCfg(P, y){ var a = P.auto || {}; var hd = HOLI[y] || [2,9]; return {base1:num(a.base1), step:num(a.step), base2:num(a.base2), days:num(a.days), leaveMonth:num(a.leaveMonth)||12, seol:num(a.seol)||hd[0], chuseok:num(a.chuseok)||hd[1]}; }
+function autoOn(P){ return P && P.auto && num(P.auto.base1) > 0; }
+// 본봉으로 자동 계산하는 수당: 명절휴가비 = 본봉 × 60%, 연가보상비 = 본봉 × 86% ÷ 30 × 일수
+function autoExtras(y, P){
+  if(!autoOn(P)) return [];
+  var c = autoCfg(P, y), baseAt = function(m){ return c.step && m >= c.step && c.base2 ? c.base2 : c.base1; };
+  var out = [
+    {name:'명절휴가비(설)', month:c.seol, amount:Math.floor(baseAt(c.seol)*0.6), auto:true, how:'본봉 '+(Math.round(baseAt(c.seol)*100)/100)+' × 60%'},
+    {name:'명절휴가비(추석)', month:c.chuseok, amount:Math.floor(baseAt(c.chuseok)*0.6), auto:true, how:'본봉 '+(Math.round(baseAt(c.chuseok)*100)/100)+' × 60%'}
+  ];
+  if(c.days > 0) out.push({name:'연가보상비', month:c.leaveMonth, amount:Math.floor(baseAt(c.leaveMonth)*0.86/30*c.days), auto:true, how:'본봉 × 86% ÷ 30 × '+c.days+'일'});
+  return out;
+}
+var AUTO_NAME = /^(명절휴가비|연가보상비)/;
+// 수동 입력 + 자동 계산 수당 (자동이 켜지면 같은 종류 수동 항목은 빼고 셈)
+function allExtras(y, P){
+  var on = autoOn(P);
+  return (P.extras || []).filter(function(e){ return !(on && AUTO_NAME.test(e.name)); }).concat(autoExtras(y, P));
+}
 function salStat(y, who){
   var P = (S.salary[y] || {})[who]; if(!P) return null;
-  var ms = (P.months || []).map(num).filter(function(v){ return v > 0; });
-  var avg = ms.length ? sum(ms)/ms.length : 0, ex = sum(P.extras || [], function(e){ return num(e.amount); });
+  var ms = (P.months || []).map(function(v){ return Math.floor(num(v) + 1e-9); }).filter(function(v){ return v > 0; });
+  var avg = ms.length ? sum(ms)/ms.length : 0, ex = sum(allExtras(y, P), function(e){ return Math.floor(num(e.amount) + 1e-9); });
   if(!ms.length && !ex) return null;
   return {n:ms.length, avg:avg, regular:sum(ms), extras:ex, annual:avg*12 + ex, monthly:avg + ex/12};
 }
@@ -938,12 +961,17 @@ function viewMoney(){
     if(st) hh += st.annual;
     h += '<div class="card"><h2>'+esc(m.name)+' 실수령<span class="sp"></span><span class="tiny">'+y+'년</span></h2>'+
       '<div class="mgrid">'+[0,1,2,3,4,5,6,7,8,9,10,11].map(function(i){
-        var v = P.months[i]; return '<label>'+(i+1)+'월<input inputmode="decimal" value="'+(v?esc(Math.round(num(v)*100)/100):'')+'" onchange="setSal('+y+',\''+esc(m.name)+'\','+i+',this.value)"></label>'; }).join('')+'</div>'+
-      '<div class="tiny" style="margin:6px 0 10px">만원 또는 원으로 입력 (5,176,320 → 517.6만). 급여일에 받은 정기 실수령만 넣습니다.</div>'+
+        var v = P.months[i]; return '<label>'+(i+1)+'월<input inputmode="decimal" value="'+(v?esc(Math.floor(num(v)+1e-9)):'')+'" onchange="setSal('+y+',\''+esc(m.name)+'\','+i+',this.value)"></label>'; }).join('')+'</div>'+
+      '<div class="tiny" style="margin:6px 0 10px">만원 또는 원으로 입력, 만원 미만 절삭 (5,176,320 → 517만). 급여일에 받은 정기 실수령만 넣습니다.</div>'+
+      autoBox(y, m.name, P)+
       '<div class="grp"><span>비정기 수당·환급</span><button class="btn sm" onclick="editExtra('+y+',\''+esc(m.name)+'\')">+ 추가</button></div>'+
-      (P.extras.length ? P.extras.slice().sort(function(a,b){ return num(a.month)-num(b.month); }).map(function(e){
-        return '<div class="row" onclick="editExtra('+y+',\''+esc(m.name)+'\',\''+e.id+'\')"><div class="m"><div class="t">'+esc(e.name)+'</div><div class="tiny">'+(e.month?e.month+'월':'')+'</div></div><div class="v">'+fm(num(e.amount))+'</div></div>'; }).join('')
-        : '<div class="empty">명절휴가비·성과상여금·연말정산 환급·연가보상비 등</div>')+
+      (function(){
+        var on = autoOn(P), list = P.extras.map(function(e){ return Object.assign({}, e, {off: on && AUTO_NAME.test(e.name)}); }).concat(autoExtras(y, P));
+        if(!list.length) return '<div class="empty">성과상여금·연말정산 환급·초과근무수당 등 (명절휴가비·연가보상비는 위 본봉으로 자동 계산)</div>';
+        return list.sort(function(a,b){ return num(a.month)-num(b.month); }).map(function(e){
+          if(e.auto) return '<div class="row" style="cursor:default"><div class="m"><div class="t">'+esc(e.name)+'<span class="tag">자동</span></div><div class="tiny">'+e.month+'월 · '+esc(e.how)+'</div></div><div class="v">'+fm(e.amount)+'</div></div>';
+          return '<div class="row" onclick="editExtra('+y+',\''+esc(m.name)+'\',\''+e.id+'\')" style="'+(e.off?'opacity:.45':'')+'"><div class="m"><div class="t" style="'+(e.off?'text-decoration:line-through':'')+'">'+esc(e.name)+'</div><div class="tiny">'+(e.month?e.month+'월':'')+(e.off?' · 자동 계산으로 대체 (합계에서 뺌)':'')+'</div></div><div class="v">'+fm(Math.floor(num(e.amount)+1e-9))+'</div></div>'; }).join('');
+      })()+
       (st ? '<div class="grid2" style="margin-top:10px"><div class="kv"><div class="k">월 평균 ('+st.n+'개월)</div><div class="v">'+fmx(st.avg)+'만</div></div><div class="kv"><div class="k">비정기 합계</div><div class="v">'+fm(st.extras)+'</div></div>'+
         '<div class="kv"><div class="k">연 환산 총수입</div><div class="v">'+fm(st.annual)+'</div></div><div class="kv"><div class="k">월 환산 (비정기 포함)</div><div class="v">'+fmx(st.monthly)+'만</div></div></div>' : '')+
       '</div>';
@@ -967,7 +995,30 @@ function viewMoney(){
   return h;
 }
 function expActiveInc(x, i){ var s = ymIdx(x.start), e = ymIdx(x.end); return (s == null || s <= i) && (e == null || i <= e); }
-function setSal(y, who, i, v){ var P = salOf(y, who); P.months[i] = String(v).trim() === '' ? null : toMan(v); commit(); }
+function setSal(y, who, i, v){ var P = salOf(y, who); P.months[i] = String(v).trim() === '' ? null : manFloor(v); commit(); }
+// 본봉 입력 칸: 승급 전·후 본봉, 승급 월, 연가보상 일수 (+ 명절·연가 지급 월)
+function autoBox(y, who, P){
+  var c = autoCfg(P, y), a = P.auto || {}, w = esc(who);
+  var f = function(label, k, val, ph){ return '<label>'+label+'<input inputmode="decimal" value="'+(val?esc(val):'')+'" placeholder="'+(ph||'')+'" onchange="setAuto('+y+',\''+w+'\',\''+k+'\',this.value)"></label>'; };
+  return '<div class="card" style="background:var(--s2);margin:0 0 10px"><h2 style="margin-bottom:8px">본봉 자동 계산<span class="sp"></span>'+
+      '<button class="btn sub sm" onclick="carryAuto('+y+',\''+w+'\')">내년으로 →</button></h2>'+
+    '<div class="mgrid">'+f('본봉 (승급 전)', 'base1', a.base1, '예: 475.65')+f('승급 월', 'step', a.step, '예: 6')+f('본봉 (승급 후)', 'base2', a.base2, '예: 480')+
+      f('연가보상 일수', 'days', a.days, '예: 15')+f('설 지급 월', 'seol', a.seol, String(c.seol))+f('추석 지급 월', 'chuseok', a.chuseok, String(c.chuseok))+'</div>'+
+    '<div class="tiny" style="margin-top:6px">본봉은 세전 월 봉급액(만원 또는 원, 소수 그대로). 명절휴가비 = 본봉 × 60%, 연가보상비 = 본봉 × 86% ÷ 30 × 일수 (12월 지급), 만원 미만 절삭. 본봉을 넣으면 같은 이름의 수동 항목은 합계에서 빠집니다.</div></div>';
+}
+function setAuto(y, who, k, v){
+  var P = salOf(y, who); P.auto = P.auto || {};
+  var s = String(v).trim();
+  P.auto[k] = s === '' ? '' : (k === 'base1' || k === 'base2' ? toMan(s) : num(s));
+  commit();
+}
+// 올해 승급 후 본봉을 내년 승급 전 본봉으로, 승급 월·연가 일수는 그대로
+function carryAuto(y, who){
+  var P = salOf(y, who), a = P.auto || {};
+  if(!num(a.base1)){ alert(y+'년 본봉을 먼저 넣으세요'); return; }
+  var N = salOf(y+1, who); N.auto = Object.assign({}, N.auto || {}, {base1: num(a.base2) || num(a.base1), step: a.step, days: a.days});
+  commit(); SAL_YEAR = y+1; render(); toast((y+1)+'년 승급 전 본봉 '+(num(a.base2)||num(a.base1))+'만 · 승급 후 본봉을 넣으세요');
+}
 function editExtra(y, who, id){
   var P = salOf(y, who), e = P.extras.find(function(x){ return x.id === id; }) || {};
   openModal('<h3>'+esc(who)+' '+y+'년 비정기 수당</h3>'+
@@ -979,7 +1030,7 @@ function editExtra(y, who, id){
     (id?'<span style="flex:1"></span><button class="btn bad" onclick="delExtra('+y+',\''+esc(who)+'\',\''+id+'\')">삭제</button>':'')+'</div>');
 }
 function saveExtra(y, who, id){
-  var P = salOf(y, who), o = {name:fv('f_name').trim()||'수당', month:fv('f_m'), amount:toMan(fv('f_a'))};
+  var P = salOf(y, who), o = {name:fv('f_name').trim()||'수당', month:fv('f_m'), amount:manFloor(fv('f_a'))};
   if(id) Object.assign(P.extras.find(function(x){ return x.id === id; }), o); else { o.id = uid(); P.extras.push(o); }
   closeModal(); commit();
 }
