@@ -962,7 +962,7 @@ function viewMoney(){
     h += '<div class="card"><h2>'+esc(m.name)+' 실수령<span class="sp"></span><span class="tiny">'+y+'년</span></h2>'+
       '<div class="mgrid">'+[0,1,2,3,4,5,6,7,8,9,10,11].map(function(i){
         var v = P.months[i]; return '<label>'+(i+1)+'월<input inputmode="decimal" value="'+(v?esc(Math.floor(num(v)+1e-9)):'')+'" onchange="setSal('+y+',\''+esc(m.name)+'\','+i+',this.value)"></label>'; }).join('')+'</div>'+
-      '<div class="tiny" style="margin:6px 0 10px">만원 또는 원으로 입력, 만원 미만 절삭 (5,176,320 → 517만). 급여일에 받은 정기 실수령만 넣습니다.</div>'+
+      '<div class="tiny" style="margin:6px 0 10px">만원 단위 입력</div>'+
       autoBox(y, m.name, P)+
       '<div class="grp"><span>비정기 수당·환급</span><button class="btn sm" onclick="editExtra('+y+',\''+esc(m.name)+'\')">+ 추가</button></div>'+
       (function(){
