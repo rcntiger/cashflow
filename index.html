@@ -160,6 +160,7 @@ function normalize(d){
   var def = defaultData();
   ['members','assets','debts','incomes','lumps','checklist'].forEach(function(k){ if(!Array.isArray(d[k])) d[k] = def[k]; });
   d.sim = Object.assign({}, def.sim, d.sim || {});
+  if(!Array.isArray(d.sim.phases)) d.sim.phases = [];
   if(!Array.isArray(d.moves)) d.moves = [];
   if(!d.rbMap || typeof d.rbMap !== 'object') d.rbMap = {};
   d.buckets = d.buckets || {};
@@ -230,7 +231,7 @@ function simulate(){
   for(var i = start; i <= end; i++){
     bal *= (1 + r);
     var inc = incomeAt(i);
-    var net = i < life ? num(sim.saveBefore) : inc - num(sim.spend);
+    var net = i < life ? num(sim.saveBefore) : inc - spendAt(i);
     net += lumpAt(i);
     bal += net; yNet += net; yIn += inc;
     if(bal < minV){ minV = bal; minI = i; }
@@ -240,12 +241,22 @@ function simulate(){
   return {years:years, minV:minV, minI:minI, firstNeg:firstNeg, start:totals(true).fin};
 }
 // 월 소득이 같은 구간끼리 묶기
+// 그 달의 월 생활비: 기본값(생활비 시작부터) → 기간별 생활비 중 시작월이 지난 마지막 구간
+function spendAt(i){
+  var life = ymIdx(S.sim.lifeStart);
+  if(life != null && i < life) return null;
+  var v = num(S.sim.spend);
+  sortedPhases().forEach(function(p){ var f = ymIdx(p.from); if(f != null && f <= i) v = num(p.monthly); });
+  return v;
+}
+function sortedPhases(){ return (S.sim.phases || []).slice().sort(function(a,b){ return (a.from||'').localeCompare(b.from||''); }); }
+// 월 소득·생활비가 같은 구간끼리 묶기
 function incomePeriods(){
   var start = nowIdx(), end = num(S.sim.endYear)*12 + 11, out = [], cur = null;
   for(var i = start; i <= end; i++){
-    var v = incomeAt(i);
-    if(cur && cur.v === v){ cur.to = i; }
-    else { cur = {from:i, to:i, v:v}; out.push(cur); }
+    var v = incomeAt(i), s = spendAt(i);
+    if(cur && cur.v === v && cur.s === s){ cur.to = i; }
+    else { cur = {from:i, to:i, v:v, s:s}; out.push(cur); }
   }
   return out;
 }
@@ -382,16 +393,17 @@ function viewFlow(){
   var bars = [];
   for(var y = y0; y <= y1; y++){
     var tot = 0; for(var m = 0; m < 12; m++) tot += incomeAt(y*12+m);
-    var avg = tot/12, sp = (life != null && y*12+11 >= life) ? num(S.sim.spend) : null;
+    var sps = [], m2; for(m2 = 0; m2 < 12; m2++){ var s2 = spendAt(y*12+m2); if(s2 != null) sps.push(s2); }
+    var avg = tot/12, sp = sps.length ? sum(sps)/sps.length : null;
     bars.push({x:String(y).slice(2), v:avg, line:sp, c: sp != null && avg < sp ? 'var(--warn)' : 'var(--c1)'});
   }
   var h = '<div class="card"><h2>연도별 가계 월 소득</h2>'+barChart(bars)+
-    '<div class="legend"><span><i style="background:var(--c1)"></i>월 소득 ≥ 생활비</span><span><i style="background:var(--warn)"></i>생활비보다 부족</span><span><i style="background:var(--bad)"></i>월 생활비 '+fm(num(S.sim.spend))+' (점선)</span></div></div>';
+    '<div class="legend"><span><i style="background:var(--c1)"></i>월 소득 ≥ 생활비</span><span><i style="background:var(--warn)"></i>생활비보다 부족</span><span><i style="background:var(--bad)"></i>월 생활비 (점선)</span></div></div>';
   var per = incomePeriods();
-  h += '<div class="card"><h2>기간별 월 소득</h2><table><tr><th>기간</th><th>월 소득</th><th>생활비 대비</th></tr>';
+  h += '<div class="card"><h2>기간별 월 소득</h2><table><tr><th>기간</th><th>소득</th><th>생활비</th><th>차이</th></tr>';
   per.forEach(function(p){
-    var after = life != null && p.to >= life, gap = p.v - num(S.sim.spend);
-    h += '<tr><td>'+ymDot(idxYm(p.from))+'~'+(p.to >= num(S.sim.endYear)*12+11 ? '' : ymDot(idxYm(p.to)))+'</td><td>'+fm(p.v)+'</td><td class="'+(after ? (gap<0?'neg':'pos') : '')+'">'+(after ? (gap>=0?'+':'')+fm(gap) : '–')+'</td></tr>';
+    var after = p.s != null, gap = after ? p.v - p.s : 0;
+    h += '<tr><td>'+ymDot(idxYm(p.from))+'~'+(p.to >= num(S.sim.endYear)*12+11 ? '' : ymDot(idxYm(p.to)))+'</td><td>'+fm(p.v)+'</td><td>'+(after ? fm(p.s) : '–')+'</td><td class="'+(after ? (gap<0?'neg':'pos') : '')+'">'+(after ? (gap>=0?'+':'')+fm(gap) : '–')+'</td></tr>';
   });
   h += '</table><div class="tiny" style="margin-top:6px">생활비 대비는 생활비 시작('+ymDot(S.sim.lifeStart)+') 이후 구간만 계산합니다</div></div>';
   h += '<div class="card"><h2>월 소득 항목<span class="sp"></span><button class="btn sm" onclick="editIncome()">+ 추가</button></h2>';
@@ -418,9 +430,14 @@ function viewSim(){
     simField('실질 수익률 (%/년)', 'rate', 'number', '0.5')+
     simField('생활비 시작 (년-월)', 'lifeStart', 'month')+
     simField('그 전 월 저축액 (만원)', 'saveBefore', 'number', '10')+
-    simField('그 후 월 생활비 (만원)', 'spend', 'number', '10')+
+    simField('기본 월 생활비 (만원)', 'spend', 'number', '10')+
     simField('계산 종료 연도', 'endYear', 'number', '1')+
     '</div><div class="tiny">물가를 뺀 실질 기준입니다. 부동산은 빼고 금융자산(주식·연금계좌·공제회·현금)만 굴립니다. 생활비 시작 전에는 소득 항목 대신 월 저축액만 더하고, 시작 후에는 월 소득 − 월 생활비를 더하거나 뺍니다. 목돈 일정은 해당 월에 반영합니다.</div></div>';
+  var ph = sortedPhases();
+  h += '<div class="card"><h2>기간별 생활비<span class="sp"></span><button class="btn sm" onclick="editPhase()">+ 구간</button></h2>'+
+    '<div class="row" style="cursor:default"><div class="m"><div class="t">'+ymDot(s.lifeStart)+'부터</div><div class="tiny">기본 월 생활비</div></div><div class="v">월 '+fm(num(s.spend))+'</div></div>'+
+    ph.map(function(p){ return '<div class="row" onclick="editPhase(\''+p.id+'\')"><div class="m"><div class="t">'+ymDot(p.from)+'부터</div>'+(p.note?'<div class="tiny">'+esc(p.note)+'</div>':'')+'</div><div class="v">월 '+fm(num(p.monthly))+'</div></div>'; }).join('')+
+    '<div class="tiny" style="margin-top:6px">구간은 시작 월부터 다음 구간 전까지 적용됩니다. 예: 2033.01 800 → 2035.01 600 → 2046.01 550</div></div>';
   if(r.firstNeg != null) h += '<div class="alert"><b class="neg">'+ymDot(idxYm(r.firstNeg))+'</b>에 금융자산이 바닥납니다. 생활비를 줄이거나 저축을 늘려 보세요.</div>';
   h += '<div class="card"><h2>예상 금융자산</h2><div class="grid2">'+
     '<div class="kv"><div class="k">지금</div><div class="v">'+fm(r.start)+'</div></div>'+
@@ -435,6 +452,23 @@ function simField(label, k, type, step){
   var v = S.sim[k];
   return '<label class="f">'+label+'<input type="'+(type==='month'?'month':'number')+'" '+(step?'step="'+step+'" ':'')+'inputmode="decimal" value="'+esc(v)+'" onchange="setSim(\''+k+'\', this.value, \''+type+'\')"></label>';
 }
+function editPhase(id){
+  var p = (S.sim.phases || []).find(function(x){ return x.id === id; }) || {};
+  openModal('<h3>'+(id?'생활비 구간 수정':'생활비 구간 추가')+'</h3>'+
+    '<label class="f">시작 (년-월)<input id="f_from" type="month" value="'+esc(p.from)+'"></label>'+
+    '<label class="f">월 생활비 (만원, 현재 가치)<input id="f_monthly" type="number" inputmode="decimal" value="'+esc(p.monthly)+'"></label>'+
+    '<label class="f">메모<input id="f_note" value="'+esc(p.note)+'" placeholder="예: 자녀 대학 재학"></label>'+
+    '<div class="btns"><button class="btn" onclick="savePhase(\''+(id||'')+'\')">저장</button><button class="btn sub" onclick="closeModal()">취소</button>'+
+    (id?'<span style="flex:1"></span><button class="btn bad" onclick="delPhase(\''+id+'\')">삭제</button>':'')+'</div>');
+}
+function savePhase(id){
+  var o = {from:fv('f_from'), monthly:num(fv('f_monthly')), note:fv('f_note').trim()};
+  if(!o.from){ alert('시작 월을 입력하세요'); return; }
+  S.sim.phases = S.sim.phases || [];
+  if(id){ Object.assign(S.sim.phases.find(function(x){ return x.id === id; }), o); } else { o.id = uid(); S.sim.phases.push(o); }
+  closeModal(); commit();
+}
+function delPhase(id){ if(!confirm('삭제할까요?')) return; S.sim.phases = S.sim.phases.filter(function(x){ return x.id !== id; }); closeModal(); commit(); }
 function setSim(k, v, type){ S.sim[k] = type === 'month' ? v : num(v); commit(); }
 
 function viewTodo(){
@@ -816,10 +850,10 @@ function bucketOptions(sel, forLump){
 }
 // 생활비 시작 이후 '소득 < 생활비' 첫 구간 (공백기)
 function gapRun(){
-  var life = ymIdx(S.sim.lifeStart), start = Math.max(nowIdx(), life == null ? nowIdx() : life), end = num(S.sim.endYear)*12 + 11, sp = num(S.sim.spend);
+  var life = ymIdx(S.sim.lifeStart), start = Math.max(nowIdx(), life == null ? nowIdx() : life), end = num(S.sim.endYear)*12 + 11;
   var run = null;
   for(var i = start; i <= end; i++){
-    var short = sp - incomeAt(i);
+    var short = (spendAt(i) || 0) - incomeAt(i);
     if(short > 0){ if(!run) run = {from:i, to:i, total:0}; run.to = i; run.total += short; }
     else if(run) break;
   }
