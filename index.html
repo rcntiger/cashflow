@@ -623,6 +623,8 @@ function cloudSchedule(){
   if(!sb || !_user) return;
   clearTimeout(_pushTimer); _pushTimer = setTimeout(cloudPush, 1500);
 }
+// 같은 시각인지 비교 (서버는 +00:00, 앱은 Z 로 적어 글자로는 다를 수 있음)
+function sameTime(a, b){ return !!a && !!b && Date.parse(a) === Date.parse(b); }
 async function cloudPush(){
   if(!sb || !_user || _busy) return;
   _busy = true; setCloud('saving');
@@ -630,13 +632,13 @@ async function cloudPush(){
     // 다른 사람이 먼저 바꿨는지 확인 (마지막으로 받은 시각과 비교)
     var cur = await sb.from('cashflow_data').select('updated_at').eq('household','home').maybeSingle();
     if(cur.error) throw cur.error;
-    if(cur.data && META.base && cur.data.updated_at !== META.base){
+    if(cur.data && META.base && !sameTime(cur.data.updated_at, META.base)){
       _busy = false; await resolveConflict(); return;
     }
     var now = new Date().toISOString();
-    var r = await sb.from('cashflow_data').upsert({household:'home', data:S, updated_at:now, updated_by:_user.email});
+    var r = await sb.from('cashflow_data').upsert({household:'home', data:S, updated_at:now, updated_by:_user.email}).select('updated_at').single();
     if(r.error) throw r.error;
-    META.base = now; META.dirty = false; saveMeta();
+    META.base = (r.data && r.data.updated_at) || now; META.dirty = false; saveMeta();   // 서버가 돌려준 시각을 기억
     setCloud('saved');
   }catch(e){
     setCloud('error', /relation|does not exist|schema cache/i.test(e.message) ? 'cashflow 테이블이 없습니다 — supabase/cashflow.sql 을 먼저 실행하세요' : e.message);
@@ -647,6 +649,7 @@ async function resolveConflict(){
   var r = await sb.from('cashflow_data').select('data,updated_at,updated_by').eq('household','home').maybeSingle();
   if(r.error || !r.data) return;
   var who = r.data.updated_by || '다른 기기';
+  if(_user && who.toLowerCase() === _user.email.toLowerCase()) who = '이 계정의 다른 기기';
   if(confirm(who + ' 가 서버 장부를 먼저 바꿨습니다.\n\n확인: 서버 장부로 바꾸기 (이 기기의 최근 수정은 버림)\n취소: 이 기기 장부로 서버를 덮어쓰기')){
     applyServer(r.data);
   } else {
@@ -669,7 +672,7 @@ async function cloudPull(manual){
     _busy = false;
     if(!r.data){                               // 서버가 비어 있음 → 이 기기 장부로 시작
       if(S.assets.length || S.incomes.length) await cloudPush(); else setCloud('saved');
-    } else if(r.data.updated_at === META.base){ // 서버 변화 없음
+    } else if(sameTime(r.data.updated_at, META.base)){ // 서버 변화 없음
       if(META.dirty) await cloudPush(); else { setCloud('saved'); render(); }
     } else if(META.dirty && (S.assets.length || S.incomes.length)){
       await resolveConflict();
