@@ -1004,7 +1004,7 @@ function autoBox(y, who, P){
       '<button class="btn sub sm" onclick="carryAuto('+y+',\''+w+'\')">내년으로 →</button></h2>'+
     '<div class="mgrid">'+f('본봉 (승급 전)', 'base1', a.base1, '예: 475.65')+f('승급 월', 'step', a.step, '예: 6')+f('본봉 (승급 후)', 'base2', a.base2, '예: 480')+
       f('연가보상 일수', 'days', a.days, '예: 15')+f('설 지급 월', 'seol', a.seol, String(c.seol))+f('추석 지급 월', 'chuseok', a.chuseok, String(c.chuseok))+'</div>'+
-    '<div class="tiny" style="margin-top:6px">본봉은 세전 월 봉급액(만원 또는 원, 소수 그대로). 명절휴가비 = 본봉 × 60%, 연가보상비 = 본봉 × 86% ÷ 30 × 일수 (12월 지급), 만원 미만 절삭. 본봉을 넣으면 같은 이름의 수동 항목은 합계에서 빠집니다.</div></div>';
+    '<div class="tiny" style="margin-top:6px">명절휴가비 = 본봉 × 60% · 연가보상비 = 본봉 × 86% ÷ 30 × 일수</div></div>';
 }
 function setAuto(y, who, k, v){
   var P = salOf(y, who); P.auto = P.auto || {};
