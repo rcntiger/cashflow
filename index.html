@@ -964,7 +964,7 @@ function viewMoney(){
         var v = P.months[i]; return '<label>'+(i+1)+'월<input inputmode="decimal" value="'+(v?esc(Math.floor(num(v)+1e-9)):'')+'" onchange="setSal('+y+',\''+esc(m.name)+'\','+i+',this.value)"></label>'; }).join('')+'</div>'+
       '<div class="tiny" style="margin:6px 0 10px">만원 단위 입력</div>'+
       autoBox(y, m.name, P)+
-      '<div class="grp"><span>비정기 수당·환급</span><button class="btn sm" onclick="editExtra('+y+',\''+esc(m.name)+'\')">+ 추가</button></div>'+
+      '<div class="grp"><span>기타 수당 및 세금 환급</span><button class="btn sm" onclick="editExtra('+y+',\''+esc(m.name)+'\')">+ 추가</button></div>'+
       (function(){
         var on = autoOn(P), list = P.extras.map(function(e){ return Object.assign({}, e, {off: on && AUTO_NAME.test(e.name)}); }).concat(autoExtras(y, P));
         if(!list.length) return '<div class="empty">성과상여금·연말정산 환급·초과근무수당 등 (명절휴가비·연가보상비는 위 본봉으로 자동 계산)</div>';
@@ -1021,7 +1021,7 @@ function carryAuto(y, who){
 }
 function editExtra(y, who, id){
   var P = salOf(y, who), e = P.extras.find(function(x){ return x.id === id; }) || {};
-  openModal('<h3>'+esc(who)+' '+y+'년 비정기 수당</h3>'+
+  openModal('<h3>'+esc(who)+' '+y+'년 기타 수당 및 세금 환급</h3>'+
     '<label class="f">이름<input id="f_name" list="exNames" value="'+esc(e.name)+'" placeholder="예: 명절휴가비(설)"></label>'+
     '<datalist id="exNames"><option>명절휴가비(설)<option>명절휴가비(추석)<option>성과상여금<option>연말정산 환급<option>연가보상비<option>정근수당<option>초과근무수당</datalist>'+
     '<div class="grid2"><label class="f">받은 달<input id="f_m" type="number" min="1" max="12" inputmode="numeric" value="'+esc(e.month)+'"></label>'+
