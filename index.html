@@ -106,6 +106,12 @@ svg text{font-family:var(--mono)}
 .mgrid label{font-size:var(--f-xs);color:var(--t2)}
 .mgrid input{width:100%;padding:8px 6px;border-radius:8px;border:1px solid var(--bd);background:var(--s2);color:var(--t1);font-family:var(--mono);font-size:var(--f-sm);text-align:right}
 .grid{display:block}
+.hbars{margin:4px 0 12px;display:flex;flex-direction:column;gap:8px}
+.hb{display:grid;grid-template-columns:86px minmax(0,1fr) 86px;align-items:center;gap:8px;cursor:pointer;font-size:var(--f-sm)}
+.hb .hl{color:var(--t2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.hb .ht{height:16px;background:var(--s2);border-radius:4px;overflow:hidden}
+.hb .ht i{display:block;height:100%;border-radius:0 4px 4px 0}
+.hb .hv{text-align:right;white-space:nowrap} .hb .hv small{color:var(--t2);font-size:var(--f-xs)}
 .simL,.simR{display:block}
 .pc,.pcI{display:none}
 @media (hover:hover){ .row:hover{background:var(--s2);border-radius:8px} tr:hover td{background:var(--s2)} .chip:hover,.hbtn:hover{border-color:var(--accent)} }
@@ -356,6 +362,7 @@ function spendAt(i){
   return v + debtCostAt(i);
 }
 // 고정지출 합계 (저축 분류 제외)
+var EXP_COLOR = {living:'var(--c0)', allowance:'var(--c2)', family:'var(--c1)', insurance:'var(--c3)', edu:'var(--c4)', house:'var(--c5)', tax:'var(--t2)', etc:'var(--t3, var(--t2))'};
 var EXP_CATS = {living:'생활비', insurance:'보험', edu:'학원·교육', house:'관리비·통신', tax:'세금', allowance:'용돈·식대', family:'양가 지원', saving:'저축 (지출 아님)', etc:'기타'};
 function expEnd(x){ var l = linkEnd(x); return l != null ? l : ymIdx(x.end); }
 function expActive(x, i){ var s = ymIdx(x.start), e = expEnd(x); return (s == null || s <= i) && (e == null || i <= e); }
@@ -1317,6 +1324,13 @@ function viewExpenses(){
   var total = expenseAt(now);
   var h = '<div class="card"><h2>월 고정지출<span class="sp"></span><span class="num" style="font-weight:500">'+fm(total)+'</span></h2>';
   if(!S.expenses.length) h += '<div class="empty">관리비·보험·학원비처럼 매달 나가는 돈. 끝나는 달을 넣으면 은퇴 후 생활비가 자동으로 계산됩니다.</div>';
+  // 분류별 가로 막대 (큰 순서, 누르면 세부 항목)
+  var bc = Object.keys(EXP_CATS).filter(function(c){ return c !== 'saving'; }).map(function(c){
+    return {c:c, v:sum(S.expenses.filter(function(x){ return x.cat === c && expActive(x, now); }), function(x){ return num(x.monthly); })}; })
+    .filter(function(o){ return o.v > 0; }).sort(function(a,b){ return b.v - a.v; });
+  var bmax = bc.length ? bc[0].v : 0;
+  if(bc.length) h += '<div class="hbars">'+bc.map(function(o){
+    return '<div class="hb" onclick="openExpCat(\''+o.c+'\')"><span class="hl">'+EXP_CATS[o.c]+'</span><span class="ht"><i style="width:'+(o.v/bmax*100)+'%;background:'+EXP_COLOR[o.c]+'"></i></span><span class="hv num">'+fm(o.v)+(HIDE?'':' <small>'+Math.round(o.v/total*100)+'%</small>')+'</span></div>'; }).join('')+'</div>';
   // 큰 항목(분류)만 보여 주고, 누르면 세부 항목을 보고 고침
   Object.keys(EXP_CATS).forEach(function(c){
     var list = S.expenses.filter(function(x){ return x.cat === c; });
