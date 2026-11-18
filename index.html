@@ -106,6 +106,9 @@ svg text{font-family:var(--mono)}
 .mgrid label{font-size:var(--f-xs);color:var(--t2)}
 .mgrid input{width:100%;padding:8px 6px;border-radius:8px;border:1px solid var(--bd);background:var(--s2);color:var(--t1);font-family:var(--mono);font-size:var(--f-sm);text-align:right}
 .grid{display:block}
+.incg{margin-top:6px} .incg+.incg{border-top:1px solid var(--bd);padding-top:8px;margin-top:8px}
+.incg-h{display:flex;align-items:center;gap:8px;margin-bottom:2px} .incg-h b{font-size:var(--f-md)}
+.gaprow{cursor:default;opacity:.85}
 .hbars{margin:4px 0 12px;display:flex;flex-direction:column;gap:8px}
 .hb{display:grid;grid-template-columns:86px minmax(0,1fr) 86px;align-items:center;gap:8px;cursor:pointer;font-size:var(--f-sm)}
 .hb .hl{color:var(--t2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -658,11 +661,27 @@ function viewFlow(){
   });
   h += '</table><div class="tiny" style="margin-top:6px">* 생활비 시작('+ymDot(S.sim.lifeStart)+') 전 생활비는 월 고정지출 합계(참고용)입니다. 시뮬레이션은 이 기간에 \'그 전 월 저축액\'을 씁니다. 생활비에는 대출 이자·상환액이 포함됩니다'+(S.sim.spendMode==='expenses'?' · 수입지출 탭의 고정지출 목록 기준':'')+'</div></div>';
   h += viewFamily();
-  h += '<div class="card R"><h2>월 소득 항목<span class="sp"></span><button class="btn sm" onclick="editIncome()">+ 추가</button></h2>';
+  h += '<div class="card R"><h2>월 소득 항목</h2>';
   if(!S.incomes.length) h += '<div class="empty">연금·급여·월세처럼 매달 들어오는 돈</div>';
-  S.incomes.slice().sort(function(a,b){ return (a.start||'').localeCompare(b.start||''); }).forEach(function(x){
-    var cur = incomeItemAt(x, Math.max(nowIdx(), ymIdx(x.start) || 0));
-    h += '<div class="row" onclick="editIncome(\''+x.id+'\')"><div class="m"><div class="t">'+esc(x.name)+(x.owner?'<span class="tag">'+esc(x.owner)+'</span>':'')+(isSalary(x)?'<span class="tag">급여 장부</span>':'')+'</div><div class="tiny">'+(x.start?ymDot(x.start):'지금')+' ~ '+(incEnd(x)!=null?ymDot(idxYm(incEnd(x)))+(!x.end?' (퇴직 월)':''):'계속')+'</div></div><div class="v">월 '+fm(cur)+'</div></div>';
+  // 명의별로 나누고, 칸 안에서는 시작 순서 · 사이가 비면 '공백' 줄
+  var owners = S.members.map(function(m){ return m.name; }).concat(['공동']);
+  S.incomes.forEach(function(x){ var o = x.owner || '공동'; if(owners.indexOf(o) < 0) owners.push(o); });
+  owners.forEach(function(o){
+    var list = S.incomes.filter(function(x){ return (x.owner || '공동') === o; })
+      .sort(function(a,b){ return (ymIdx(a.start) || 0) - (ymIdx(b.start) || 0); });
+    if(!list.length && o === '공동') return;
+    h += '<div class="incg"><div class="incg-h"><b>'+esc(o)+'</b><span class="sp" style="flex:1"></span><button class="btn sub sm" onclick="editIncome(\'\',\''+esc(o)+'\')">+ 추가</button></div>';
+    if(!list.length) h += '<div class="tiny" style="padding:4px 2px 8px">항목 없음</div>';
+    var prevEnd = null;
+    list.forEach(function(x){
+      var si = ymIdx(x.start), ei = incEnd(x);
+      if(prevEnd != null && si != null && si > prevEnd + 1)
+        h += '<div class="row gaprow"><div class="m"><div class="t wrn">공백</div><div class="tiny">'+ymDot(idxYm(prevEnd+1))+' ~ '+ymDot(idxYm(si-1))+' · '+Math.round((si-prevEnd-1)/12*10)/10+'년</div></div><div class="v wrn">0</div></div>';
+      if(ei == null) prevEnd = Infinity; else if(prevEnd == null || ei > prevEnd) prevEnd = ei;
+      var cur = incomeItemAt(x, Math.max(nowIdx(), si || 0));
+      h += '<div class="row" onclick="editIncome(\''+x.id+'\')"><div class="m"><div class="t">'+esc(x.name)+(isSalary(x)?'<span class="tag">급여 장부</span>':'')+'</div><div class="tiny">'+(x.start?ymDot(x.start):'지금')+' ~ '+(ei!=null?ymDot(idxYm(ei))+(!x.end?' (퇴직 월)':''):'계속')+'</div></div><div class="v">월 '+fm(cur)+'</div></div>';
+    });
+    h += '</div>';
   });
   h += '</div><div class="card"><h2>목돈 일정<span class="sp"></span><button class="btn sm" onclick="editLump()">+ 추가</button></h2>';
   if(!S.lumps.length) h += '<div class="empty">퇴직수당·적금 만기·교육비 같은 일회성 입출금</div>';
@@ -824,8 +843,8 @@ function editDebt(id){
     '<div class="btns"><button class="btn" onclick="upsertItem(\'debts\',\''+(id||'')+'\',{name:fv(\'f_name\').trim()||\'부채\',owner:fv(\'f_owner\'),value:num(fv(\'f_value\')),rate:fv(\'f_rate\'),pay:fv(\'f_pay\'),start:fv(\'f_start\'),end:fv(\'f_end\'),note:fv(\'f_note\').trim()})">저장</button><button class="btn sub" onclick="closeModal()">취소</button>'+
     (id?'<span style="flex:1"></span><button class="btn bad" onclick="delItem(\'debts\',\''+id+'\')">삭제</button>':'')+'</div>');
 }
-function editIncome(id){
-  var x = S.incomes.find(function(i){ return i.id === id; }) || {};
+function editIncome(id, owner){
+  var x = S.incomes.find(function(i){ return i.id === id; }) || (owner ? {owner:owner} : {});
   openModal('<h3>'+(id?'월 소득 수정':'월 소득 추가')+'</h3>'+
     '<label class="f">이름<input id="f_name" value="'+esc(x.name)+'" placeholder="예: 공무원연금"></label>'+
     '<label class="f">누구<select id="f_owner">'+ownerOptions(x.owner)+'</select></label>'+
