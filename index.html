@@ -1108,7 +1108,7 @@ function setSal(y, who, i, v){ var P = salOf(y, who); P.months[i] = String(v).tr
 function autoBox(y, who, P){
   var c = autoCfg(P, y), a = P.auto || {}, w = esc(who);
   var f = function(label, k, val, ph){ return '<label>'+label+'<input inputmode="decimal" value="'+(val?esc(val):'')+'" placeholder="'+(ph||'')+'" onchange="setAuto('+y+',\''+w+'\',\''+k+'\',this.value)"></label>'; };
-  return '<div class="card" style="background:var(--s2);margin:0 0 10px"><h2 style="margin-bottom:8px">본봉 자동 계산<span class="sp"></span>'+
+  return '<div class="card" style="background:var(--s2);margin:0 0 10px"><h2 style="margin-bottom:8px">본봉 입력<span class="sp"></span>'+
       '<button class="btn sub sm" onclick="carryAuto('+y+',\''+w+'\')">내년으로 →</button></h2>'+
     '<div class="mgrid">'+f('본봉 (승급 전)', 'base1', a.base1, '예: 475.65')+f('승급 월', 'step', a.step, '예: 6')+f('본봉 (승급 후)', 'base2', a.base2, '예: 480')+
       f('연가보상 일수', 'days', a.days, '예: 15')+f('설 지급 월', 'seol', a.seol, String(c.seol))+f('추석 지급 월', 'chuseok', a.chuseok, String(c.chuseok))+'</div>'+
@@ -1159,7 +1159,7 @@ function applySalaryIncome(y){
 
 function viewExpenses(){
   var now = nowIdx(), cy = Math.floor(now/12), life = ymIdx(S.sim.lifeStart);
-  var h = '<div class="card"><h2>고정지출<span class="sp"></span><button class="btn sm" onclick="editExpense()">+ 추가</button></h2>';
+  var h = '<div class="card"><h2>월 고정지출<span class="sp"></span><button class="btn sm" onclick="editExpense()">+ 추가</button></h2>';
   if(!S.expenses.length) h += '<div class="empty">관리비·보험·학원비처럼 매달 나가는 돈. 끝나는 달을 넣으면 은퇴 후 생활비가 자동으로 계산됩니다.</div>';
   Object.keys(EXP_CATS).forEach(function(c){
     var list = S.expenses.filter(function(x){ return x.cat === c; }); if(!list.length) return;
