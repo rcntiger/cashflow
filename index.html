@@ -1216,8 +1216,7 @@ function viewMoney(){
     '<tr><td>그 밖의 소득 (월세 등)</td><td>'+fm(other)+'</td></tr>'+
     '<tr><td>월 고정지출</td><td class="neg">−'+fm(exp)+'</td></tr>'+
     (dc ? '<tr><td>대출 이자·상환</td><td class="neg">−'+fm(dc)+'</td></tr>' : '')+
-    '<tr><th style="text-align:left">월 저축 여력</th><th class="'+(cap<0?'neg':'pos')+'" style="font-size:var(--f-md)">'+fm(cap)+'</th></tr></table>'+
-    (saving ? '<div class="tiny" style="margin-top:6px">저축 분류 '+fm(saving)+'은 지출에서 빼고 저축 여력에 포함됩니다</div>' : '')+
+    '<tr><td>월 저축 여력</td><td class="'+(cap<0?'neg':'pos')+'">'+fm(cap)+'</td></tr></table>'+
     '<div class="btns"><button class="btn sm" onclick="applySaving('+Math.round(cap)+')">시뮬레이션 \'그 전 월 저축액\'에 반영</button>'+(S.members.some(function(m){ return !S.incomes.some(function(x){ return isSalary(x) && x.owner === m.name; }); }) ? '<button class="btn sub sm" onclick="applySalaryIncome('+y+')">현금흐름에 급여 항목 연결</button>' : '')+'</div>'+
     '<div class="tiny" style="margin-top:6px">지금 시뮬레이션 값: 월 '+fm(num(S.sim.saveBefore))+'</div></div>';
   // 고정지출
