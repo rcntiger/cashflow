@@ -22,10 +22,12 @@
 [data-theme=dark]{
   --bg:#080C12;--s1:#0F1520;--s2:#161E2E;--s3:#1E2A3E;
   --bd:#253047;--t1:#C8D8EC;--t2:#6B84A0;--t3:#344560;
+  --debt-bg:#221822;--debt-bd:#4A2C3A;
 }
 [data-theme=light]{
   --bg:#EEF3FB;--s1:#FFFFFF;--s2:#F5F8FF;--s3:#EAF0FA;
   --bd:#DDE6F5;--t1:#1A2540;--t2:#6B7A99;--t3:#B0BAD0;
+  --debt-bg:#FDEEF1;--debt-bd:#F4CAD3;
 }
 *{box-sizing:border-box;margin:0;padding:0}
 html{-webkit-text-size-adjust:100%}
@@ -505,7 +507,7 @@ function viewAssets(){
   });
   if(S.assets.length) h += '<div class="btns"><button class="btn sub sm" onclick="syncRebalancer()">↻ 리밸런서에서 불러오기</button><button class="btn sub sm" onclick="openRbMap()">리밸런서 계좌 연결</button></div>';
   h += '</div>';
-  h += '<div class="card"><h2>부채<span class="sp"></span><button class="btn sm" onclick="editDebt()">+ 추가</button></h2>';
+  h += '<div class="card" style="background:var(--debt-bg);border-color:var(--debt-bd)"><h2>부채<span class="sp"></span><button class="btn sm" onclick="editDebt()">+ 추가</button></h2>';
   if(!byOwner(S.debts).length) h += '<div class="empty">전세보증금·대출 등을 기록합니다</div>';
   byOwner(S.debts).forEach(function(d){
     var di = [];
