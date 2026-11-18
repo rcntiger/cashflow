@@ -1651,7 +1651,7 @@ function viewAlloc(){
   byOwner(S.assets).forEach(function(a){ if(a.bucket && cur[a.bucket] != null) cur[a.bucket] += num(a.value); });
   S.lumps.forEach(function(l){ var i = lumpNext(l, now); if(l.bucket && planned[l.bucket] && i != null && i >= now && (!run || l.bucket !== 'gap' || i < run.from)) planned[l.bucket].push(l); });
   var fin = cur.reserve + cur.gap + cur.growth;
-  var parts = Object.keys(BUCKETS).filter(function(k){ return cur[k] > 0; }).map(function(k){ return {n:BUCKETS[k], v:cur[k], c:BUCKET_COLOR[k]}; });
+  var parts = Object.keys(BUCKETS).map(function(k){ return {n:BUCKETS[k], v:cur[k], c:BUCKET_COLOR[k]}; });
   var h = ownerChips() + (OWNER ? '<div class="tiny" style="margin:-4px 2px 10px">목적별 예산의 목표 금액은 가계 전체 기준이라 명의별로 보면 부족해 보일 수 있습니다</div>' : '') + '<div class="card R"><h2>목적별 예산 3개</h2>'+donut(parts)+'<div class="tiny" style="margin-top:8px">목적별 예산은 자산 탭에서 자산마다 지정합니다. 부동산은 넣지 않습니다.</div></div>';
 
   h += kpis([[BUCKETS.reserve, fm(cur.reserve), '', '목표 '+fm(bt.reserve)], [BUCKETS.gap, fm(cur.gap), '', '목표 '+fm(bt.gap)], [BUCKETS.growth, fm(cur.growth), '', fin ? '금융자산의 '+Math.round(cur.growth/fin*100)+'%' : ''], ['금융자산 합계', fm(fin)]]);
