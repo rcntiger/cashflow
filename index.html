@@ -107,35 +107,36 @@ svg text{font-family:var(--mono)}
 .mgrid input{width:100%;padding:8px 6px;border-radius:8px;border:1px solid var(--bd);background:var(--s2);color:var(--t1);font-family:var(--mono);font-size:var(--f-sm);text-align:right}
 .grid{display:block}
 .simL,.simR{display:block}
+.pc,.pcI{display:none}
 @media (hover:hover){ .row:hover{background:var(--s2);border-radius:8px} tr:hover td{background:var(--s2)} .chip:hover,.hbtn:hover{border-color:var(--accent)} }
 @media (min-width:640px){
-  main{max-width:1100px;padding:16px 20px calc(90px + env(safe-area-inset-bottom))}
-  .grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;align-items:start}
-  .grid>.card{margin:0}
-  .grid>.wide,.grid>.chips,.grid>.alert,.grid>.tiny{grid-column:1/-1}
-  .grid>.chips,.grid>.alert,.grid>.tiny{margin:0}
-  .grid>.span2{grid-column:span 2}
-  .g-todo{grid-template-columns:minmax(0,720px);justify-content:center}
-  .g-sim{grid-template-columns:minmax(300px,380px) minmax(0,1fr)}
-  .simL{position:sticky;top:76px} .simL>.card,.simR>.card{margin:0 0 14px}
+  main{max-width:760px;padding:16px 20px calc(90px + env(safe-area-inset-bottom))}
   .modal{align-items:center}
   .sheet{max-width:540px;border-radius:16px;max-height:86vh;padding:20px}
 }
-@media (min-width:1100px){
-  body{padding-left:200px}
-  header{padding-left:24px}
-  nav{top:0;bottom:0;left:0;right:auto;width:200px;flex-direction:column;border-top:0;border-right:1px solid var(--bd);padding:72px 10px 20px;gap:4px}
+@media (min-width:1024px){
+  body{padding-left:208px}
+  header{padding:14px 28px}
+  nav{top:0;bottom:0;left:0;right:auto;width:208px;flex-direction:column;border-top:0;border-right:1px solid var(--bd);padding:76px 12px 20px;gap:4px}
+  nav::before{content:'캐시플로우';position:absolute;top:22px;left:26px;font-weight:700;font-size:var(--f-lg);color:var(--t1)}
   nav button{flex:none;flex-direction:row;justify-content:flex-start;gap:12px;padding:11px 14px;border-radius:10px;font-size:var(--f-sm)}
   nav button .ic{width:22px;text-align:center}
   nav button.on{background:var(--s2)}
-  main{max-width:1280px;padding:20px 28px 40px}
-  .grid{grid-template-columns:repeat(3,minmax(0,1fr))}
-  .g-sim{grid-template-columns:380px minmax(0,1fr)}
-  .g-todo{grid-template-columns:minmax(0,720px)}
-  .grid>.span2{grid-column:span 2}
-  nav::before{content:'캐시플로우';position:absolute;top:18px;left:24px;font-weight:700;font-size:var(--f-lg);color:var(--t1)}
-  header h1{visibility:hidden}
+  main{max-width:1320px;padding:22px 28px 48px}
   #toast{bottom:28px}
+  .mob{display:none}
+  .pc{display:block} .pcI{display:inline}
+  .kpis.pc{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:14px;margin-bottom:16px}
+  .kpi{background:var(--s1);border:1px solid var(--bd);border-radius:14px;padding:14px 16px;min-height:86px}
+  .kpi .k{font-size:var(--f-xs);color:var(--t2)}
+  .kpi .v{font-size:22px;font-weight:700;margin-top:6px;white-space:nowrap}
+  .lay{display:grid;grid-template-columns:minmax(0,2fr) minmax(330px,1fr);gap:16px;align-items:start}
+  .lay .card{margin:0 0 16px}
+  .pair{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+  .lay>.colL>.chips,.lay>.colL>.tiny{margin-bottom:12px}
+  .g-sim{display:grid;grid-template-columns:380px minmax(0,1fr);gap:16px;align-items:start}
+  .simL{position:sticky;top:80px} .simL>.card,.simR>.card{margin:0 0 16px}
+  .g-todo{max-width:760px;margin:0 auto}
 }
 .alert{background:var(--s2);border-left:3px solid var(--warn);border-radius:8px;padding:10px;font-size:var(--f-sm);margin-bottom:10px}
 </style>
@@ -435,6 +436,27 @@ function render(){
   }).join('');
   var v = document.getElementById('view');
   v.innerHTML = '<div class="grid g-'+TAB+'">' + ({dash:viewDash, assets:viewAssets, alloc:viewAlloc, money:viewMoney, flow:viewFlow, sim:viewSim, todo:viewTodo}[TAB] || viewDash)() + '</div>';
+  pcLayout(v);
+  var tb = TABS.find(function(t){ return t.id === TAB; }), h1 = document.querySelector('header h1');
+  if(h1) h1.textContent = isPC() && tb ? tb.name : '캐시플로우';
+}
+function isPC(){ return window.innerWidth >= 1024; }
+// PC: 요약 타일·명의 칩·안내는 위, .R 카드는 오른쪽 열, 나머지는 왼쪽 열에 위아래로 쌓음
+function pcLayout(v){
+  if(!isPC() || TAB === 'sim' || TAB === 'todo') return;
+  var box = v.firstChild, kids = [].slice.call(box.children);
+  var lay = document.createElement('div'), L = document.createElement('div'), R = document.createElement('div');
+  lay.className = 'lay'; L.className = 'colL'; R.className = 'colR';
+  kids.forEach(function(el){
+    var c = el.classList;
+    if(c.contains('R')) R.appendChild(el);
+    else if(c.contains('kpis') || c.contains('chips') || c.contains('alert') || c.contains('top')) box.insertBefore(el, null);
+    else L.appendChild(el);
+  });
+  lay.appendChild(L); lay.appendChild(R); box.appendChild(lay);
+}
+function kpis(arr){
+  return '<div class="kpis pc">'+arr.map(function(k){ return '<div class="kpi"><div class="k">'+k[0]+'</div><div class="v num '+(k[2]||'')+'">'+k[1]+'</div>'+(k[3]?'<div class="tiny">'+k[3]+'</div>':'')+'</div>'; }).join('')+'</div>';
 }
 function ownerChips(){
   var opts = [''].concat(S.members.map(function(m){ return m.name; }), ['공동']);
@@ -534,16 +556,28 @@ function viewDash(){
   } else if(OWNER){
     delta = '<div class="tiny" style="margin-top:2px">'+esc(OWNER)+' 명의만 · 추이와 기록은 가계 전체 기준</div>';
   }
+  h += kpis([['순자산', fm(t.net), '', delta ? delta.replace(/<[^>]+>/g,'') : ''], ['총자산', fm(t.assets), 'pos'], ['부채', '−'+fm(t.debts), 'neg'], ['금융자산', fm(t.fin)], ['이번 달 소득', fm(inc), '', mi.src]]);
   h += dueLumpsCard();
   if(!S.assets.length) h += '<div class="alert">아직 기록이 없습니다. <b>자산</b> 탭에서 입력하거나, ⚙ 설정에서 JSON 파일을 가져오세요.</div>';
-  h += '<div class="card"><div class="muted">순자산</div><div class="big num">'+fm(t.net)+(HIDE?'':'원')+'</div>'+delta+
+  h += '<div class="card mob"><div class="muted">순자산</div><div class="big num">'+fm(t.net)+(HIDE?'':'원')+'</div>'+delta+
     '<div class="grid2" style="margin-top:12px">'+
     '<div class="kv"><div class="k">총자산</div><div class="v pos">'+fm(t.assets)+'</div></div>'+
     '<div class="kv"><div class="k">부채</div><div class="v neg">−'+fm(t.debts)+'</div></div>'+
     '<div class="kv"><div class="k">금융자산</div><div class="v">'+fm(t.fin)+'</div></div>'+
     '<div class="kv"><div class="k">이번 달 소득</div><div class="v">'+fm(inc)+'</div><div class="tiny">'+mi.src+'</div></div>'+
     '</div>'+assetText(t)+'</div>';
-  h += '<div class="card"><h2>자산 비중</h2>'+donut(parts)+'</div>';
+  h += '<div class="card R"><h2>자산 비중</h2>'+donut(parts)+'</div>';
+  // PC 오른쪽: 다가오는 목돈
+  var now0 = nowIdx(), up = S.lumps.filter(function(l){ return !l.done; }).map(function(l){ return {l:l, i:lumpNext(l, now0)}; })
+    .filter(function(o){ return o.i != null && o.i >= now0; }).sort(function(a,b){ return a.i-b.i; }).slice(0, 6);
+  var ex0 = expenseAt(now0), dc0 = debtCostAt(now0), cap0 = inc - ex0 - dc0;
+  h += '<div class="card pc R"><h2>이번 달 현금흐름</h2><table>'+
+    '<tr><td>소득</td><td>'+fm(inc)+'</td></tr><tr><td>월 고정지출</td><td class="neg">−'+fm(ex0)+'</td></tr>'+
+    (dc0 ? '<tr><td>대출 이자·상환</td><td class="neg">−'+fm(dc0)+'</td></tr>' : '')+
+    '<tr><th style="text-align:left">남는 돈</th><th class="'+(cap0<0?'neg':'pos')+'">'+fm(cap0)+'</th></tr></table>'+
+    '<div class="btns"><button class="btn sub sm" onclick="go(\'money\')">수입지출 보기</button></div></div>';
+  h += '<div class="card pc"><h2>다가오는 목돈<span class="sp"></span><button class="btn sub sm" onclick="go(\'flow\')">전체</button></h2>'+
+    (up.length ? up.map(function(o){ var a = num(o.l.amount); return '<div class="row" onclick="editLump(\''+o.l.id+'\')"><div class="m"><div class="t">'+esc(o.l.name)+'</div><div class="tiny">'+ymDot(idxYm(o.i))+'</div></div><div class="v '+(a<0?'neg':'pos')+'">'+(a>=0?'+':'')+fm(a)+'</div></div>'; }).join('') : '<div class="empty">예정된 목돈이 없습니다</div>')+'</div>';
   h += '<div class="card wide"><h2>순자산 추이<span class="sp"></span><button class="btn sm '+(saved?'sub':'')+'" onclick="saveSnapshot()">'+(saved?'이번 달 다시 기록':'이번 달 기록')+'</button></h2>'+
     lineChart(pts, {zero:false, empty:'매달 한 번 [이번 달 기록]을 누르면 추이가 쌓입니다'})+
     (keys.length ? '<div class="tiny" style="margin-top:6px">기록 '+keys.length+'개 · 최근 '+ymDot(keys[keys.length-1])+'</div>' : '')+'</div>';
@@ -551,7 +585,9 @@ function viewDash(){
 }
 
 function viewAssets(){
-  var t = totals(), h = ownerChips() + '<div class="card"><h2>자산<span class="sp"></span><button class="btn sm" onclick="editAsset()">+ 추가</button></h2>';
+  var t = totals(), h = ownerChips();
+  h += kpis(Object.keys(CATS).filter(function(c){ return t.byCat[c] > 0; }).map(function(c){ return [CATS[c], fm(t.byCat[c]), '', t.assets ? Math.round(t.byCat[c]/t.assets*100)+'%' : '']; }).concat([['부채', '−'+fm(t.debts), 'neg']]));
+  h += '<div class="card"><h2>자산<span class="sp"></span><button class="btn sm" onclick="editAsset()">+ 추가</button></h2>';
   if(!byOwner(S.assets).length) h += '<div class="empty">'+(OWNER?'이 명의의 자산이 없습니다':'아직 자산이 없습니다')+'</div>';
   Object.keys(CATS).forEach(function(c){
     var list = byOwner(S.assets).filter(function(a){ return a.cat === c; });
@@ -560,12 +596,12 @@ function viewAssets(){
     list.forEach(function(a){
       h += '<div class="row" onclick="editAsset(\''+a.id+'\')"><div class="m"><div class="t">'+esc(a.name)+
         (a.owner ? '<span class="tag">'+esc(a.owner)+'</span>' : '')+(a.bucket ? '<span class="tag">'+BUCKETS[a.bucket].slice(0,1)+'</span>' : '')+(isRbAsset(a.id) ? '<span class="tag">리밸런서</span>' : '')+'</div>'+
-        (a.note || a.src ? '<div class="tiny">'+esc([a.note, a.src].filter(Boolean).join(' · '))+'</div>' : '')+'</div><div class="v">'+fm(num(a.value))+'</div></div>';
+        (a.note || a.src ? '<div class="tiny">'+esc([a.note, a.src].filter(Boolean).join(' · '))+'</div>' : '')+'</div><div class="v">'+fm(num(a.value))+(t.assets?'<span class="tiny pcI" style="display:inline-block;width:44px;text-align:right">'+Math.round(num(a.value)/t.assets*100)+'%</span>':'')+'</div></div>';
     });
   });
   if(S.assets.length) h += '<div class="btns"><button class="btn sub sm" onclick="syncRebalancer()">↻ 리밸런서에서 불러오기</button><button class="btn sub sm" onclick="openRbMap()">리밸런서 계좌 연결</button></div>';
   h += '</div>';
-  h += '<div class="card" style="background:var(--debt-bg);border-color:var(--debt-bd)"><h2>부채<span class="sp"></span><button class="btn sm" onclick="editDebt()">+ 추가</button></h2>';
+  h += '<div class="card R" style="background:var(--debt-bg);border-color:var(--debt-bd)"><h2>부채<span class="sp"></span><button class="btn sm" onclick="editDebt()">+ 추가</button></h2>';
   if(!byOwner(S.debts).length) h += '<div class="empty">전세보증금·대출 등을 기록합니다</div>';
   byOwner(S.debts).forEach(function(d){
     var di = [];
@@ -575,7 +611,12 @@ function viewAssets(){
     if(d.note) di.push(esc(d.note));
     h += '<div class="row" onclick="editDebt(\''+d.id+'\')"><div class="m"><div class="t">'+esc(d.name)+'</div>'+(di.length?'<div class="tiny">'+di.join(' · ')+'</div>':'')+'</div><div class="v neg">−'+fm(num(d.value))+'</div></div>';
   });
-  h += '</div><div class="card"><div class="grid2"><div class="kv"><div class="k">총자산</div><div class="v">'+fm(t.assets)+'</div></div><div class="kv"><div class="k">순자산</div><div class="v">'+fm(t.net)+'</div></div></div><div class="tiny" style="margin-top:8px">금액 단위는 만원입니다</div></div>';
+  var own = {}; byOwner(S.assets).forEach(function(a){ var k = a.owner || '공동'; own[k] = (own[k] || 0) + num(a.value); });
+  var ownRows = Object.keys(own).sort(function(a,b){ return own[b]-own[a]; }).map(function(k){ var pct = t.assets ? own[k]/t.assets*100 : 0;
+    return '<div style="margin-top:10px"><div style="display:flex;font-size:var(--f-sm)"><span>'+esc(k)+'</span><span class="sp" style="flex:1"></span><span class="num">'+fm(own[k])+' <span class="tiny">'+Math.round(pct)+'%</span></span></div>'+
+      '<div style="height:6px;background:var(--s3);border-radius:99px;margin-top:4px;overflow:hidden"><div style="height:100%;width:'+pct+'%;background:var(--accent)"></div></div></div>'; }).join('');
+  h += '</div><div class="card R"><div class="grid2"><div class="kv"><div class="k">총자산</div><div class="v">'+fm(t.assets)+'</div></div><div class="kv"><div class="k">순자산</div><div class="v">'+fm(t.net)+'</div></div></div>'+
+    (ownRows ? '<h2 style="margin-top:14px">명의별 자산</h2>'+ownRows : '')+'<div class="tiny" style="margin-top:10px">금액 단위는 만원입니다</div></div>';
   return h;
 }
 
@@ -588,20 +629,23 @@ function viewFlow(){
     var avg = tot/12, sp = sps.length ? sum(sps)/sps.length : null;
     bars.push({x:String(y).slice(2), v:avg, line:sp, c: sp != null && avg < sp ? 'var(--warn)' : 'var(--c1)'});
   }
-  var h = viewTimeline() + '<div class="card span2"><h2>연도별 가계 월 소득</h2>'+barChart(bars)+
+  var per0 = incomePeriods(), gaps = per0.filter(function(p){ return p.s != null; }).map(function(p){ return p.v - p.s; });
+  var worst = gaps.length ? Math.min.apply(null, gaps) : 0;
+  var h = kpis([['지금 월 소득', fm(incomeAt(cur))], ['은퇴 후 월 소득', life != null ? fm(incomeAt(life)) : '–', '', life != null ? ymDot(S.sim.lifeStart)+'부터' : ''], ['은퇴 후 월 생활비', life != null && spendAt(life) != null ? fm(spendAt(life)) : '–'], ['가장 모자란 구간', worst < 0 ? fm(worst) : '없음', worst < 0 ? 'neg' : 'pos', '월 기준']]);
+  h += viewTimeline() + '<div class="card"><h2>연도별 가계 월 소득</h2>'+barChart(bars)+
     '<div class="legend"><span><i style="background:var(--c1)"></i>월 소득 ≥ 생활비</span><span><i style="background:var(--warn)"></i>생활비보다 부족</span><span><i style="background:var(--bad)"></i>월 생활비 (점선)</span></div></div>';
   var per = incomePeriods();
   // 모바일에서 줄바꿈되지 않게: 기간은 '26.11~32.12, 금액은 만원 단위 숫자만
   var yy = function(i){ var s = idxYm(i); return s.slice(2,4)+'.'+s.slice(5); };
   var nm = function(v){ return HIDE ? '••••' : Math.round(v).toLocaleString('ko-KR'); };
-  h += '<div class="card"><h2>기간별 월 소득<span class="sp"></span><span class="tiny">단위 만원</span></h2><table><tr><th>기간</th><th>소득</th><th>생활비</th><th>차이</th></tr>';
+  h += '<div class="card R"><h2>기간별 월 소득<span class="sp"></span><span class="tiny">단위 만원</span></h2><table><tr><th>기간</th><th>소득</th><th>생활비</th><th>차이</th></tr>';
   per.forEach(function(p){
     var after = p.s != null, gap = after ? p.v - p.s : 0;
     h += '<tr'+(p.pre?' style="color:var(--t2)"':'')+'><td>'+yy(p.from)+'~'+(p.to >= num(S.sim.endYear)*12+11 ? '' : yy(p.to))+(p.pre?'*':'')+'</td><td>'+nm(p.v)+'</td><td>'+(after ? nm(p.s) : '–')+'</td><td class="'+(after ? (gap<0?'neg':'pos') : '')+'">'+(after ? (gap>=0?'+':'')+nm(gap) : '–')+'</td></tr>';
   });
   h += '</table><div class="tiny" style="margin-top:6px">* 생활비 시작('+ymDot(S.sim.lifeStart)+') 전 생활비는 월 고정지출 합계(참고용)입니다. 시뮬레이션은 이 기간에 \'그 전 월 저축액\'을 씁니다. 생활비에는 대출 이자·상환액이 포함됩니다'+(S.sim.spendMode==='expenses'?' · 수입지출 탭의 고정지출 목록 기준':'')+'</div></div>';
   h += viewFamily();
-  h += '<div class="card"><h2>월 소득 항목<span class="sp"></span><button class="btn sm" onclick="editIncome()">+ 추가</button></h2>';
+  h += '<div class="card R"><h2>월 소득 항목<span class="sp"></span><button class="btn sm" onclick="editIncome()">+ 추가</button></h2>';
   if(!S.incomes.length) h += '<div class="empty">연금·급여·월세처럼 매달 들어오는 돈</div>';
   S.incomes.slice().sort(function(a,b){ return (a.start||'').localeCompare(b.start||''); }).forEach(function(x){
     var cur = incomeItemAt(x, Math.max(nowIdx(), ymIdx(x.start) || 0));
@@ -1137,20 +1181,24 @@ function viewMoney(){
     chips.map(function(k){ return '<button class="chip '+(k===y?'on':'')+'" onclick="SAL_YEAR='+k+';render()">'+k+(years.indexOf(k)>=0?' ·':'')+'</button>'; }).join('')+
     '<button class="chip" onclick="SAL_YEAR++;render()" aria-label="다음 연도">▶</button>'+(y!==cy?'<button class="chip" onclick="SAL_YEAR='+cy+';render()">올해</button>':'')+'</div>';
   // 급여 장부
-  var hh = 0;
+  var hh = 0, mm = [];
+  h += '<div class="pair">';
   S.members.forEach(function(m){
     var P = salOf(y, m.name), st = salStat(y, m.name);
     if(st) hh += st.annual;
+    mm.push([esc(m.name)+' 월 환산', st ? fmx(st.monthly)+'만' : '–', '', y+'년 비정기 포함']);
     h += '<div class="card"><h2>'+esc(m.name)+' 급여<span class="sp"></span><span class="tiny">'+y+'년</span></h2>'+salRows(y, m.name, P, st)+
       (st ? '<div class="grid2" style="margin-top:10px"><div class="kv"><div class="k">연 환산 총수입</div><div class="v">'+fm(st.annual)+'</div></div><div class="kv"><div class="k">월 환산 (비정기 포함)</div><div class="v">'+fmx(st.monthly)+'만</div></div></div>' : '')+
       '</div>';
   });
+  h += '</div>';
   // 저축 여력
   var other = sum(S.incomes.filter(function(x){ return !isSalary(x) && expActiveInc(x, now); }), function(x){ return num(x.monthly); });
   var exp = expenseAt(now), saving = sum(S.expenses.filter(function(x){ return x.cat === 'saving' && expActive(x, now); }), function(x){ return num(x.monthly); });
   var dc = debtCostAt(now);
   var inM = hh/12 + other, cap = inM - exp - dc;
-  h += '<div class="card"><h2>저축 여력 ('+y+'년 급여 기준)</h2><table>'+
+  h = h.replace('<div class="pair">', kpis(mm.concat([['월 고정지출', fm(exp), 'neg'], ['월 저축 여력', fm(cap), cap<0?'neg':'pos']])) + '<div class="pair">');
+  h += '<div class="card R"><h2>저축 여력 ('+y+'년 급여 기준)</h2><table>'+
     '<tr><td>급여 (비정기 포함, 월 환산)</td><td>'+fm(hh/12)+'</td></tr>'+
     '<tr><td>그 밖의 소득 (월세 등)</td><td>'+fm(other)+'</td></tr>'+
     '<tr><td>월 고정지출</td><td class="neg">−'+fm(exp)+'</td></tr>'+
@@ -1269,7 +1317,7 @@ function viewExpenses(){
   });
   if(S.expenses.length){
     var pts = [now, (cy+2)*12, (cy+5)*12, life, life != null ? life+24 : null, (cy+15)*12, (cy+20)*12].filter(function(v,i,a){ return v != null && a.indexOf(v) === i; }).sort(function(a,b){ return a-b; });
-    h += '<div style="margin-top:12px"><table><tr><th>시기</th><th>예상 월 고정지출</th></tr>'+pts.map(function(i){ return '<tr><td style="white-space:normal">'+ymDot(idxYm(i))+(agesAt(i)?'<div class="tiny">'+agesAt(i).replace(/^ · /,'')+'</div>':'')+'</td><td>'+fm(expenseAt(i))+'</td></tr>'; }).join('')+'</table></div>'+
+    h += '</div><div class="card R"><h2>시기별 예상 월 고정지출</h2><table><tr><th>시기</th><th>금액</th></tr>'+pts.map(function(i){ return '<tr><td style="white-space:normal">'+ymDot(idxYm(i))+(agesAt(i)?'<div class="tiny">'+agesAt(i).replace(/^ · /,'')+'</div>':'')+'</td><td>'+fm(expenseAt(i))+'</td></tr>'; }).join('')+'</table>'+
       '<div class="tiny" style="margin-top:6px">저축 분류는 합계에서 빠집니다. 이 목록으로 은퇴 후 생활비를 계산하려면 시뮬 탭에서 \'고정지출 목록\'을 고르세요'+(S.sim.spendMode==='expenses'?' (사용 중)':'')+'</div>';
   }
   return h + '</div>';
@@ -1395,6 +1443,7 @@ function viewTimeline(){
   var lanes = timelineLanes(), marks = timelineMarks();
   var y0 = new Date().getFullYear(), y1 = y0 + 22, A = y0*12, B = (y1+1)*12;
   var vw = (document.getElementById('view') || {}).clientWidth || 380;
+  if(isPC()) vw = Math.min((vw - 16) * 2/3, vw - 346);
   var W = Math.max(340, Math.min(1200, vw - 34)), L = 40, R = 4, PW = W - L - R, top = 52, LH = 30, BH = 22;
   var X = function(i){ return L + PW * (Math.max(A, Math.min(B, i)) - A) / (B - A); };
   var Hh = top + lanes.length*LH + 30, g = '';
@@ -1503,7 +1552,7 @@ function familyMilestones(){
   return out.sort(function(a,b){ return a.i - b.i; });
 }
 function viewFamily(){
-  var h = '<div class="card"><h2>가족 나이<span class="sp"></span><button class="btn sm" onclick="editFamily()">+ 추가</button></h2>';
+  var h = '<div class="card R"><h2>가족 나이<span class="sp"></span><button class="btn sm" onclick="editFamily()">+ 추가</button></h2>';
   if(!S.family.length) return h + '<div class="empty">생일을 넣으면 목돈 일정과 지출 표에 그때 나이가 함께 보입니다</div></div>';
   var now = nowIdx(), cy = Math.floor(now/12), ys = [cy];
   S.lumps.forEach(function(l){ var i = ymIdx(l.month); if(i != null && !l.repeat) ys.push(Math.floor(i/12)); });
@@ -1577,8 +1626,9 @@ function viewAlloc(){
   S.lumps.forEach(function(l){ var i = lumpNext(l, now); if(l.bucket && planned[l.bucket] && i != null && i >= now && (!run || l.bucket !== 'gap' || i < run.from)) planned[l.bucket].push(l); });
   var fin = cur.reserve + cur.gap + cur.growth;
   var parts = Object.keys(BUCKETS).filter(function(k){ return cur[k] > 0; }).map(function(k){ return {n:BUCKETS[k], v:cur[k], c:BUCKET_COLOR[k]}; });
-  var h = ownerChips() + (OWNER ? '<div class="tiny" style="margin:-4px 2px 10px">목적별 예산의 목표 금액은 가계 전체 기준이라 명의별로 보면 부족해 보일 수 있습니다</div>' : '') + '<div class="card"><h2>목적별 예산 3개</h2>'+donut(parts)+'<div class="tiny" style="margin-top:8px">목적별 예산은 자산 탭에서 자산마다 지정합니다. 부동산은 넣지 않습니다.</div></div>';
+  var h = ownerChips() + (OWNER ? '<div class="tiny" style="margin:-4px 2px 10px">목적별 예산의 목표 금액은 가계 전체 기준이라 명의별로 보면 부족해 보일 수 있습니다</div>' : '') + '<div class="card R"><h2>목적별 예산 3개</h2>'+donut(parts)+'<div class="tiny" style="margin-top:8px">목적별 예산은 자산 탭에서 자산마다 지정합니다. 부동산은 넣지 않습니다.</div></div>';
 
+  h += kpis([[BUCKETS.reserve, fm(cur.reserve), '', '목표 '+fm(bt.reserve)], [BUCKETS.gap, fm(cur.gap), '', '목표 '+fm(bt.gap)], [BUCKETS.growth, fm(cur.growth), '', fin ? '금융자산의 '+Math.round(cur.growth/fin*100)+'%' : ''], ['금융자산 합계', fm(fin)]]);
   if(run){
     h += '<div class="alert">'+(run.endless
       ? '생활비 시작 뒤로 <b>소득이 생활비보다 계속 적습니다</b>. ② 공백 대비 대신 ③ 성장에서 매년 꺼내 쓰는 구조입니다. 생활비를 다시 확인하세요.'
@@ -1611,7 +1661,7 @@ function viewAlloc(){
   var items = S.moves.map(function(m){ return {id:m.id, month:m.month, text:m.text, done:m.done}; });
   if(run && !run.endless) items.push({auto:true, month:idxYm(run.from - 1), text:'② 공백 대비 자금 '+fm(bt.gap)+'을 예금·단기채로 옮기기 ('+ymDot(idxYm(run.from))+'부터 매달 꺼내 씀)'});
   items.sort(function(a,b){ return (a.month||'').localeCompare(b.month||''); });
-  h += '<div class="card wide"><h2>이동 계획<span class="sp"></span><button class="btn sm" onclick="editMove()">+ 추가</button></h2>';
+  h += '<div class="card R"><h2>이동 계획<span class="sp"></span><button class="btn sm" onclick="editMove()">+ 추가</button></h2>';
   if(!items.length) h += '<div class="empty">목적별 예산 사이에서 돈을 옮길 일정을 적어 둡니다</div>';
   items.forEach(function(m){
     var i = ymIdx(m.month), soon = !m.done && i != null && i - now <= 12 && i >= now, past = !m.done && i != null && i < now;
