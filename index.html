@@ -137,6 +137,11 @@ svg text{font-family:var(--mono)}
   .g-sim{display:grid;grid-template-columns:380px minmax(0,1fr);gap:16px;align-items:start}
   .simL{position:sticky;top:80px} .simL>.card,.simR>.card{margin:0 0 16px}
   .g-todo{max-width:760px;margin:0 auto}
+  .dnut-big{gap:40px!important;justify-content:center;padding:10px 0}
+  .dnut-big svg{width:280px;height:280px}
+  .dnut-big .legend{flex:0 1 auto!important;gap:14px!important;font-size:var(--f-md)}
+  .dnut-big .legend i{width:12px;height:12px}
+  .dnut-big .legend b{font-weight:500;color:var(--t2)}
 }
 .alert{background:var(--s2);border-left:3px solid var(--warn);border-radius:8px;padding:10px;font-size:var(--f-sm);margin-bottom:10px}
 </style>
@@ -374,7 +379,7 @@ function incomePeriods(){
 }
 
 /* ════════ 차트 (SVG) ════════ */
-function donut(parts){
+function donut(parts, big){
   var tot = sum(parts, function(p){ return p.v; });
   if(tot <= 0) return '<div class="empty">자산을 입력하면 비중이 보입니다</div>';
   var R = 54, C = 2*Math.PI*R, off = 0, segs = '';
@@ -383,8 +388,8 @@ function donut(parts){
     segs += '<circle cx="70" cy="70" r="'+R+'" fill="none" stroke="'+p.c+'" stroke-width="22" stroke-dasharray="'+len+' '+(C-len)+'" stroke-dashoffset="'+(-off)+'" transform="rotate(-90 70 70)"/>';
     off += len;
   });
-  var leg = parts.map(function(p){ return '<span><i style="background:'+p.c+'"></i>'+esc(p.n)+' '+Math.round(p.v/tot*100)+'%</span>'; }).join('');
-  return '<div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap"><svg width="140" height="140" viewBox="0 0 140 140">'+segs+'</svg><div class="legend" style="flex:1;flex-direction:column;gap:6px">'+leg+'</div></div>';
+  var leg = parts.map(function(p){ return '<span><i style="background:'+p.c+'"></i>'+esc(p.n)+' '+Math.round(p.v/tot*100)+'%'+(big?'<b class="num pcI"> · '+fm(p.v)+'</b>':'')+'</span>'; }).join('');
+  return '<div class="'+(big?'dnut-big':'')+'" style="display:flex;align-items:center;gap:14px;flex-wrap:wrap"><svg width="140" height="140" viewBox="0 0 140 140">'+segs+'</svg><div class="legend" style="flex:1;flex-direction:column;gap:6px">'+leg+'</div></div>';
 }
 function lineChart(pts, opt){
   opt = opt || {};
@@ -468,7 +473,7 @@ function toggleHide(){ HIDE = !HIDE; localStorage.setItem('cf_hide', HIDE ? '1' 
 function monthIncome(i){
   var srcs = {};
   S.incomes.forEach(function(x){ if(isSalary(x) && expActiveInc(x, i)){ var l = ledgerMonthly(x.owner, i); srcs[l ? l.src : 'item'] = 1; } });
-  var src = srcs.actual ? '급여 장부 (이번 달 입력)' : srcs.avg ? '급여 장부 월 환산' : '소득 항목 기준';
+  var src = srcs.actual ? '급여 장부 (이번 달 입력)' : srcs.avg ? '부부 월 급여 합산' : '소득 항목 기준';
   return {v: incomeAt(i), src: src};
 }
 // 순자산 카드: 자산군별 금액을 그 색 글자로 (도표 없이)
@@ -566,19 +571,19 @@ function viewDash(){
     '<div class="kv"><div class="k">금융자산</div><div class="v">'+fm(t.fin)+'</div></div>'+
     '<div class="kv"><div class="k">이번 달 소득</div><div class="v">'+fm(inc)+'</div><div class="tiny">'+mi.src+'</div></div>'+
     '</div>'+assetText(t)+'</div>';
-  h += '<div class="card R"><h2>자산 비중</h2>'+donut(parts)+'</div>';
+  h += '<div class="card"><h2>자산 비중</h2>'+donut(parts, true)+'</div>';
   // PC 오른쪽: 다가오는 목돈
   var now0 = nowIdx(), up = S.lumps.filter(function(l){ return !l.done; }).map(function(l){ return {l:l, i:lumpNext(l, now0)}; })
     .filter(function(o){ return o.i != null && o.i >= now0; }).sort(function(a,b){ return a.i-b.i; }).slice(0, 6);
   var ex0 = expenseAt(now0), dc0 = debtCostAt(now0), cap0 = inc - ex0 - dc0;
-  h += '<div class="card pc R"><h2>이번 달 현금흐름</h2><table>'+
+  h += '<div class="card pc"><h2>이번 달 현금흐름</h2><table>'+
     '<tr><td>소득</td><td>'+fm(inc)+'</td></tr><tr><td>월 고정지출</td><td class="neg">−'+fm(ex0)+'</td></tr>'+
     (dc0 ? '<tr><td>대출 이자·상환</td><td class="neg">−'+fm(dc0)+'</td></tr>' : '')+
     '<tr><th style="text-align:left">남는 돈</th><th class="'+(cap0<0?'neg':'pos')+'">'+fm(cap0)+'</th></tr></table>'+
     '<div class="btns"><button class="btn sub sm" onclick="go(\'money\')">수입지출 보기</button></div></div>';
-  h += '<div class="card pc"><h2>다가오는 목돈<span class="sp"></span><button class="btn sub sm" onclick="go(\'flow\')">전체</button></h2>'+
+  h += '<div class="card pc R"><h2>다가오는 목돈<span class="sp"></span><button class="btn sub sm" onclick="go(\'flow\')">전체</button></h2>'+
     (up.length ? up.map(function(o){ var a = num(o.l.amount); return '<div class="row" onclick="editLump(\''+o.l.id+'\')"><div class="m"><div class="t">'+esc(o.l.name)+'</div><div class="tiny">'+ymDot(idxYm(o.i))+'</div></div><div class="v '+(a<0?'neg':'pos')+'">'+(a>=0?'+':'')+fm(a)+'</div></div>'; }).join('') : '<div class="empty">예정된 목돈이 없습니다</div>')+'</div>';
-  h += '<div class="card wide"><h2>순자산 추이<span class="sp"></span><button class="btn sm '+(saved?'sub':'')+'" onclick="saveSnapshot()">'+(saved?'이번 달 다시 기록':'이번 달 기록')+'</button></h2>'+
+  h += '<div class="card R"><h2>순자산 추이<span class="sp"></span><button class="btn sm '+(saved?'sub':'')+'" onclick="saveSnapshot()">'+(saved?'이번 달 다시 기록':'이번 달 기록')+'</button></h2>'+
     lineChart(pts, {zero:false, empty:'매달 한 번 [이번 달 기록]을 누르면 추이가 쌓입니다'})+
     (keys.length ? '<div class="tiny" style="margin-top:6px">기록 '+keys.length+'개 · 최근 '+ymDot(keys[keys.length-1])+'</div>' : '')+'</div>';
   return h;
