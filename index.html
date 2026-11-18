@@ -239,9 +239,19 @@ function ledgerMonthly(who, i){
   var y = Math.floor(i/12), m = i%12, P = (S.salary[y] || {})[who];
   var pay = P && P.months ? Math.floor(num(P.months[m]) + 1e-9) : 0;
   if(pay > 0) return {v: pay + sum(allExtras(y, P).filter(function(e){ return num(e.month) === m+1; }), function(e){ return Math.floor(num(e.amount) + 1e-9); }), src:'actual'};
-  var ys = Object.keys(S.salary).map(Number).filter(function(k){ return k <= y && salStat(k, who); }).sort(function(a,b){ return b-a; });
-  if(!ys.length) ys = Object.keys(S.salary).map(Number).filter(function(k){ return salStat(k, who); }).sort(function(a,b){ return a-b; });
-  if(ys.length){ var st = salStat(ys[0], who); return {v: Math.round(st.monthly), src:'avg', year: ys[0]}; }
+  // 월급은 실수령을 입력한 가장 최근 연도의 월 평균, 수당은 그해 기록(본봉 자동 포함)이 있으면 그해 것, 없으면 같은 연도 것
+  var hasMonths = function(k){ var s = salStat(k, who); return s && s.n > 0; };
+  var all = Object.keys(S.salary).map(Number);
+  var ys = all.filter(function(k){ return k <= y && hasMonths(k); }).sort(function(a,b){ return b-a; });
+  if(!ys.length) ys = all.filter(hasMonths).sort(function(a,b){ return a-b; });
+  if(ys.length){
+    var base = salStat(ys[0], who), P0 = S.salary[ys[0]][who], Py = (S.salary[y] || {})[who];
+    var autoPart = Py && autoOn(Py) ? autoExtras(y, Py) : autoExtras(ys[0], P0);       // 명절·연가: 그해 본봉이 있으면 그해 것
+    var mSrc = Py && (Py.extras || []).length ? Py : P0, anyAuto = autoPart.length > 0;   // 성과상여금 등: 그해 기록 없으면 최근 연도 것
+    var manual = (mSrc.extras || []).filter(function(e){ return !(anyAuto && AUTO_NAME.test(e.name)); });
+    var ex = sum(autoPart.concat(manual), function(e){ return Math.floor(num(e.amount) + 1e-9); });
+    return {v: Math.round(base.avg + ex/12), src:'avg', year: ys[0]};
+  }
   return null;
 }
 function incomeItemAt(x, i){
