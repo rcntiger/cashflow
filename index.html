@@ -1225,7 +1225,7 @@ function setSal(y, who, i, v){ var P = salOf(y, who); P.months[i] = String(v).tr
 function salAutoLine(y, who, P){
   var c = autoCfg(P, y), on = autoOn(P);
   return '<div class="row" style="margin-top:10px;border-top:1px solid var(--bd);border-bottom:0" onclick="openSalAuto('+y+',\''+esc(who)+'\')"><div class="m"><div class="tiny">⚙ '+
-    (on ? '본봉 '+c.base1+(c.base2 ? ' → '+c.step+'월 '+c.base2 : '')+(c.days ? ' · 연가 '+c.days+'일' : '')+'<br>명절휴가비·연가보상비 자동 계산 중' : '본봉을 넣으면 명절휴가비·연가보상비가 자동 계산됩니다')+
+    (on ? '본봉 '+c.base1+(c.base2 ? ' → '+c.step+'월 '+c.base2 : '')+(c.days ? ' · 연가 '+c.days+'일' : '')+'<br>명절휴가비·연가보상비 자동계산' : '본봉을 넣으면 명절휴가비·연가보상비가 자동 계산됩니다')+
     '</div></div><div class="v tiny">›</div></div>';
 }
 function salRows(y, who, P, st){
