@@ -1247,7 +1247,7 @@ function openSalMonths(y, who){
 function openSalAuto(y, who){
   var P = salOf(y, who);
   openModal('<h3>'+esc(who)+' '+y+'년 본봉</h3>'+autoBox(y, who, P)+
-    '<div class="tiny" style="margin:-4px 0 10px">입력하면 바로 저장됩니다. 명절휴가비·연가보상비 자동계산 결과는 \'기타 수당 및 세금 환급\'에 반영됩니다</div>'+
+    '<div class="tiny" style="margin:-4px 0 10px">명절휴가비·연가보상비 자동계산</div>'+
     '<div class="btns"><button class="btn" onclick="closeModal()">완료</button></div>');
 }
 function openSalExtras(y, who){
