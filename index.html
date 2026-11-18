@@ -105,6 +105,38 @@ svg text{font-family:var(--mono)}
 .mgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
 .mgrid label{font-size:var(--f-xs);color:var(--t2)}
 .mgrid input{width:100%;padding:8px 6px;border-radius:8px;border:1px solid var(--bd);background:var(--s2);color:var(--t1);font-family:var(--mono);font-size:var(--f-sm);text-align:right}
+.grid{display:block}
+.simL,.simR{display:block}
+@media (hover:hover){ .row:hover{background:var(--s2);border-radius:8px} tr:hover td{background:var(--s2)} .chip:hover,.hbtn:hover{border-color:var(--accent)} }
+@media (min-width:640px){
+  main{max-width:1100px;padding:16px 20px calc(90px + env(safe-area-inset-bottom))}
+  .grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;align-items:start}
+  .grid>.card{margin:0}
+  .grid>.wide,.grid>.chips,.grid>.alert,.grid>.tiny{grid-column:1/-1}
+  .grid>.chips,.grid>.alert,.grid>.tiny{margin:0}
+  .grid>.span2{grid-column:span 2}
+  .g-todo{grid-template-columns:minmax(0,720px);justify-content:center}
+  .g-sim{grid-template-columns:minmax(300px,380px) minmax(0,1fr)}
+  .simL{position:sticky;top:76px} .simL>.card,.simR>.card{margin:0 0 14px}
+  .modal{align-items:center}
+  .sheet{max-width:540px;border-radius:16px;max-height:86vh;padding:20px}
+}
+@media (min-width:1100px){
+  body{padding-left:200px}
+  header{padding-left:24px}
+  nav{top:0;bottom:0;left:0;right:auto;width:200px;flex-direction:column;border-top:0;border-right:1px solid var(--bd);padding:72px 10px 20px;gap:4px}
+  nav button{flex:none;flex-direction:row;justify-content:flex-start;gap:12px;padding:11px 14px;border-radius:10px;font-size:var(--f-sm)}
+  nav button .ic{width:22px;text-align:center}
+  nav button.on{background:var(--s2)}
+  main{max-width:1280px;padding:20px 28px 40px}
+  .grid{grid-template-columns:repeat(3,minmax(0,1fr))}
+  .g-sim{grid-template-columns:380px minmax(0,1fr)}
+  .g-todo{grid-template-columns:minmax(0,720px)}
+  .grid>.span2{grid-column:span 2}
+  nav::before{content:'캐시플로우';position:absolute;top:18px;left:24px;font-weight:700;font-size:var(--f-lg);color:var(--t1)}
+  header h1{visibility:hidden}
+  #toast{bottom:28px}
+}
 .alert{background:var(--s2);border-left:3px solid var(--warn);border-radius:8px;padding:10px;font-size:var(--f-sm);margin-bottom:10px}
 </style>
 </head>
@@ -402,7 +434,7 @@ function render(){
     return '<button class="'+(t.id===TAB?'on':'')+'" onclick="go(\''+t.id+'\')"><span class="ic">'+t.ic+'</span>'+t.name+'</button>';
   }).join('');
   var v = document.getElementById('view');
-  v.innerHTML = ({dash:viewDash, assets:viewAssets, alloc:viewAlloc, money:viewMoney, flow:viewFlow, sim:viewSim, todo:viewTodo}[TAB] || viewDash)();
+  v.innerHTML = '<div class="grid g-'+TAB+'">' + ({dash:viewDash, assets:viewAssets, alloc:viewAlloc, money:viewMoney, flow:viewFlow, sim:viewSim, todo:viewTodo}[TAB] || viewDash)() + '</div>';
 }
 function ownerChips(){
   var opts = [''].concat(S.members.map(function(m){ return m.name; }), ['공동']);
@@ -439,7 +471,7 @@ function dueLumps(){
 }
 function dueLumpsCard(){
   var d = dueLumps(); if(!d.length) return '';
-  return '<div class="card" style="border-color:var(--warn)"><h2><span class="wrn">●</span> 날짜가 된 목돈 '+d.length+'건</h2>'+
+  return '<div class="card wide" style="border-color:var(--warn)"><h2><span class="wrn">●</span> 날짜가 된 목돈 '+d.length+'건</h2>'+
     d.map(function(x){ var a = num(x.l.amount);
       return '<div style="padding:10px 0;border-top:1px solid var(--bd)"><div style="display:flex;gap:8px"><div class="m" style="flex:1"><div class="t">'+esc(x.l.name)+'</div><div class="tiny">'+ymDot(idxYm(x.i))+' · '+(a>=0?'받으셨나요?':'쓰셨나요?')+'</div></div><div class="v num '+(a<0?'neg':'pos')+'">'+(a>=0?'+':'')+fm(a)+'</div></div>'+
         '<div class="btns" style="margin-top:8px"><button class="btn sm" onclick="dueApply(\''+x.l.id+'\','+x.i+')">자산에 반영</button><button class="btn sub sm" onclick="dueDelay(\''+x.l.id+'\','+x.i+')">날짜 미루기</button><button class="btn sub sm" onclick="dueDone(\''+x.l.id+'\','+x.i+')">반영 안 함</button></div></div>'; }).join('')+
@@ -512,7 +544,7 @@ function viewDash(){
     '<div class="kv"><div class="k">이번 달 소득</div><div class="v">'+fm(inc)+'</div><div class="tiny">'+mi.src+'</div></div>'+
     '</div>'+assetText(t)+'</div>';
   h += '<div class="card"><h2>자산 비중</h2>'+donut(parts)+'</div>';
-  h += '<div class="card"><h2>순자산 추이<span class="sp"></span><button class="btn sm '+(saved?'sub':'')+'" onclick="saveSnapshot()">'+(saved?'이번 달 다시 기록':'이번 달 기록')+'</button></h2>'+
+  h += '<div class="card wide"><h2>순자산 추이<span class="sp"></span><button class="btn sm '+(saved?'sub':'')+'" onclick="saveSnapshot()">'+(saved?'이번 달 다시 기록':'이번 달 기록')+'</button></h2>'+
     lineChart(pts, {zero:false, empty:'매달 한 번 [이번 달 기록]을 누르면 추이가 쌓입니다'})+
     (keys.length ? '<div class="tiny" style="margin-top:6px">기록 '+keys.length+'개 · 최근 '+ymDot(keys[keys.length-1])+'</div>' : '')+'</div>';
   return h;
@@ -556,7 +588,7 @@ function viewFlow(){
     var avg = tot/12, sp = sps.length ? sum(sps)/sps.length : null;
     bars.push({x:String(y).slice(2), v:avg, line:sp, c: sp != null && avg < sp ? 'var(--warn)' : 'var(--c1)'});
   }
-  var h = viewTimeline() + '<div class="card"><h2>연도별 가계 월 소득</h2>'+barChart(bars)+
+  var h = viewTimeline() + '<div class="card span2"><h2>연도별 가계 월 소득</h2>'+barChart(bars)+
     '<div class="legend"><span><i style="background:var(--c1)"></i>월 소득 ≥ 생활비</span><span><i style="background:var(--warn)"></i>생활비보다 부족</span><span><i style="background:var(--bad)"></i>월 생활비 (점선)</span></div></div>';
   var per = incomePeriods();
   // 모바일에서 줄바꿈되지 않게: 기간은 '26.11~32.12, 금액은 만원 단위 숫자만
@@ -590,7 +622,7 @@ function viewSim(){
   var keyYears = [2033, 2041, 2046, num(s.endYear)].filter(function(y,i,a){ return a.indexOf(y) === i; });
   var pts = r.years.map(function(y){ return {x:String(y.y).slice(2), y:y.bal}; });
   var marks = [{x:String(Math.floor((ymIdx(s.lifeStart)||nowIdx())/12)).slice(2), t:'생활비 시작', c:'var(--warn)'}];
-  var h = '<div class="card"><h2>가정</h2><div class="grid2">'+
+  var h = '<div class="simL"><div class="card"><h2>가정</h2><div class="grid2">'+
     simField('실질 수익률 (%/년)', 'rate', 'number', '0.5')+
     simField('생활비 시작 (년-월)', 'lifeStart', 'month')+
     simField('그 전 월 저축액 (만원)', 'saveBefore', 'number', '10')+
@@ -607,6 +639,7 @@ function viewSim(){
     ph.map(function(p){ return '<div class="row" onclick="editPhase(\''+p.id+'\')"><div class="m"><div class="t">'+ymDot(p.from)+'부터</div>'+(p.note?'<div class="tiny">'+esc(p.note)+'</div>':'')+'</div><div class="v">월 '+fm(num(p.monthly))+'</div></div>'; }).join('')+
     '<div class="tiny" style="margin-top:6px">구간은 시작 월부터 다음 구간 전까지 적용됩니다. 예: 2033.01 800 → 2035.01 600 → 2046.01 550</div></div>';
   if(S.debts.some(function(d){ return num(d.rate) > 0 || num(d.pay) > 0; })) h += '<div class="tiny" style="margin:-4px 2px 12px">대출 이자·상환액은 생활비와 별도로 매달 빠집니다 (지금 월 '+fm(debtCostAt(nowIdx()))+')</div>';
+  h += '</div><div class="simR">';
   if(r.firstNeg != null) h += '<div class="alert"><b class="neg">'+ymDot(idxYm(r.firstNeg))+'</b>에 금융자산이 바닥납니다. 생활비를 줄이거나 저축을 늘려 보세요.</div>';
   h += '<div class="card"><h2>예상 금융자산</h2><div class="grid2">'+
     '<div class="kv"><div class="k">지금</div><div class="v">'+fm(r.start)+'</div></div>'+
@@ -615,6 +648,7 @@ function viewSim(){
     '</div><div style="margin-top:12px">'+lineChart(pts, {marks:marks})+'</div></div>';
   h += '<div class="card"><h2>연도별</h2><table><tr><th>연도</th><th>연간 순현금</th><th>연말 금융자산</th></tr>'+
     r.years.map(function(y){ return '<tr><td>'+y.y+'</td><td class="'+(y.net<0?'neg':'')+'">'+(y.net>=0?'+':'')+fm(y.net)+'</td><td>'+fm(y.bal)+'</td></tr>'; }).join('')+'</table></div>';
+  h += '</div>';
   return h;
 }
 function simField(label, k, type, step){
@@ -667,6 +701,15 @@ function closeModal(fromPop){
   document.getElementById('modal').classList.remove('on');
   if(_modalPushed){ _modalPushed = false; if(!fromPop){ _ignorePop = true; history.back(); } }
 }
+// PC 단축키: 1~7 탭 이동, Esc 창 닫기 / 창 크기 바뀌면 다시 그림
+document.addEventListener('keydown', function(e){
+  if(e.key === 'Escape' && modalOpen()){ closeModal(); return; }
+  var tag = (e.target.tagName || '').toLowerCase();
+  if(modalOpen() || tag === 'input' || tag === 'select' || tag === 'textarea' || e.ctrlKey || e.metaKey || e.altKey) return;
+  var n = parseInt(e.key, 10); if(n >= 1 && n <= TABS.length) go(TABS[n-1].id);
+});
+var _rsz = null, _lastW = window.innerWidth;
+window.addEventListener('resize', function(){ clearTimeout(_rsz); _rsz = setTimeout(function(){ if(Math.abs(window.innerWidth - _lastW) > 40){ _lastW = window.innerWidth; render(); } }, 200); });
 window.addEventListener('popstate', function(e){
   if(_ignorePop){ _ignorePop = false; return; }
   if(modalOpen()){ _modalPushed = false; closeModal(true); return; }
@@ -1351,7 +1394,8 @@ function viewTimeline(){
     return '<div class="card"><h2>생애 타임라인</h2><div class="empty">아래 \'가족 나이\'에 본인·배우자·자녀 생일을 넣으면 재직·연금·학업·군 복무가 연도 축에 그려집니다</div></div>';
   var lanes = timelineLanes(), marks = timelineMarks();
   var y0 = new Date().getFullYear(), y1 = y0 + 22, A = y0*12, B = (y1+1)*12;
-  var W = 380, L = 40, R = 4, PW = W - L - R, top = 52, LH = 30, BH = 22;
+  var vw = (document.getElementById('view') || {}).clientWidth || 380;
+  var W = Math.max(340, Math.min(1200, vw - 34)), L = 40, R = 4, PW = W - L - R, top = 52, LH = 30, BH = 22;
   var X = function(i){ return L + PW * (Math.max(A, Math.min(B, i)) - A) / (B - A); };
   var Hh = top + lanes.length*LH + 30, g = '';
   // 가까운 번호는 하나로 묶어 '1–3'처럼 표시, 묶음끼리도 가까우면 두 줄로 엇갈림
@@ -1379,7 +1423,7 @@ function viewTimeline(){
   var ay = top + lanes.length*LH + 4;
   g += '<line x1="'+L+'" x2="'+(W-R)+'" y1="'+ay+'" y2="'+ay+'" stroke="var(--bd)"/>';
   for(var yy = y0; yy <= y1; yy += 4) g += '<text x="'+X(yy*12)+'" y="'+(ay+16)+'" font-size="11" text-anchor="'+(yy===y0?'start':'middle')+'" fill="var(--t2)">\''+String(yy).slice(2)+'</text>';
-  var h = '<div class="card"><h2>생애 타임라인<span class="sp"></span><span class="tiny">막대를 눌러 수정</span></h2>'+
+  var h = '<div class="card wide"><h2>생애 타임라인<span class="sp"></span><span class="tiny">막대를 눌러 수정</span></h2>'+
     '<svg viewBox="0 0 '+W+' '+Hh+'" width="100%">'+g+'</svg>'+
     '<div class="legend"><span><i style="background:var(--c5)"></i>재직</span><span><i style="background:var(--warn)"></i>공백</span><span><i style="background:var(--c1)"></i>연금</span><span><i style="background:var(--c3)"></i>학교</span><span><i style="background:var(--t2)"></i>군</span></div>';
   if(marks.length) h += '<div style="margin-top:8px">'+marks.map(function(m, n){
@@ -1567,7 +1611,7 @@ function viewAlloc(){
   var items = S.moves.map(function(m){ return {id:m.id, month:m.month, text:m.text, done:m.done}; });
   if(run && !run.endless) items.push({auto:true, month:idxYm(run.from - 1), text:'② 공백 대비 자금 '+fm(bt.gap)+'을 예금·단기채로 옮기기 ('+ymDot(idxYm(run.from))+'부터 매달 꺼내 씀)'});
   items.sort(function(a,b){ return (a.month||'').localeCompare(b.month||''); });
-  h += '<div class="card"><h2>이동 계획<span class="sp"></span><button class="btn sm" onclick="editMove()">+ 추가</button></h2>';
+  h += '<div class="card wide"><h2>이동 계획<span class="sp"></span><button class="btn sm" onclick="editMove()">+ 추가</button></h2>';
   if(!items.length) h += '<div class="empty">목적별 예산 사이에서 돈을 옮길 일정을 적어 둡니다</div>';
   items.forEach(function(m){
     var i = ymIdx(m.month), soon = !m.done && i != null && i - now <= 12 && i >= now, past = !m.done && i != null && i < now;
