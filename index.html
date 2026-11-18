@@ -178,6 +178,8 @@ function normalize(d){
   if(!d.salary || typeof d.salary !== 'object') d.salary = {};
   if(!Array.isArray(d.expenses)) d.expenses = [];
   if(!Array.isArray(d.family)) d.family = [];
+  var mnames = (d.members || []).map(function(m){ return m.name; });
+  d.incomes.forEach(function(x){ if(x.kind == null && /근로소득|급여|월급/.test(x.name || '') && mnames.indexOf(x.owner) >= 0) x.kind = 'salary'; });
   if(!Array.isArray(d.moves)) d.moves = [];
   if(!d.rbMap || typeof d.rbMap !== 'object') d.rbMap = {};
   d.buckets = d.buckets || {};
@@ -231,11 +233,32 @@ function totals(all){
   var fin = sum(A.filter(function(a){ return FIN_CATS.indexOf(a.cat) >= 0; }), function(a){ return num(a.value); });
   return {assets:assets, debts:debts, net:assets-debts, byCat:byCat, fin:fin};
 }
+// 급여 항목: 수입지출 탭 급여 장부와 연동 (그달 실제 입력값 → 없으면 가장 최근 연도 월 환산)
+function isSalary(x){ return x.kind === 'salary'; }
+function ledgerMonthly(who, i){
+  var y = Math.floor(i/12), m = i%12, P = (S.salary[y] || {})[who];
+  var pay = P && P.months ? Math.floor(num(P.months[m]) + 1e-9) : 0;
+  if(pay > 0) return {v: pay + sum(allExtras(y, P).filter(function(e){ return num(e.month) === m+1; }), function(e){ return Math.floor(num(e.amount) + 1e-9); }), src:'actual'};
+  var ys = Object.keys(S.salary).map(Number).filter(function(k){ return k <= y && salStat(k, who); }).sort(function(a,b){ return b-a; });
+  if(!ys.length) ys = Object.keys(S.salary).map(Number).filter(function(k){ return salStat(k, who); }).sort(function(a,b){ return a-b; });
+  if(ys.length){ var st = salStat(ys[0], who); return {v: Math.round(st.monthly), src:'avg', year: ys[0]}; }
+  return null;
+}
+function incomeItemAt(x, i){
+  if(isSalary(x)){ var l = ledgerMonthly(x.owner, i); if(l) return l.v; }
+  return num(x.monthly);
+}
+// 급여 항목에 끝 월이 없으면 가족 정보의 퇴직 월(없으면 정년)까지로 봄
+function incEnd(x){
+  var e = ymIdx(x.end); if(e != null || !isSalary(x)) return e;
+  var f = S.family.find(function(m){ return (m.rel === '본인' || m.rel === '배우자') && memberOf(m) === x.owner && m.birth; });
+  return f ? retireIdx(f) : null;
+}
 function incomeAt(i){
   return sum(S.incomes.filter(function(x){
-    var s = ymIdx(x.start), e = ymIdx(x.end);
+    var s = ymIdx(x.start), e = incEnd(x);
     return (s == null || s <= i) && (e == null || i <= e);
-  }), function(x){ return num(x.monthly); });
+  }), function(x){ return incomeItemAt(x, i); });
 }
 function lumpAt(i){
   return sum(S.lumps.filter(function(x){ return lumpHits(x, i); }), function(x){ return num(x.amount); });
@@ -377,19 +400,10 @@ function setOwner(o){ OWNER = o; localStorage.setItem('cf_owner', o); render(); 
 function toggleHide(){ HIDE = !HIDE; localStorage.setItem('cf_hide', HIDE ? '1' : '0'); render(); }
 // 이번 달 소득: 급여 장부에 이번 달 금액이 있으면 그 값(+ 이번 달 수당), 없으면 근로소득 항목 + 그 밖의 소득 항목
 function monthIncome(i){
-  var y = Math.floor(i/12), m = i%12, v = 0, fromLedger = [];
-  S.incomes.forEach(function(x){ if(!/^근로소득/.test(x.name) && expActiveInc(x, i)) v += num(x.monthly); });
-  S.members.forEach(function(mb){
-    var P = (S.salary[y] || {})[mb.name], pay = P && P.months ? Math.floor(num(P.months[m]) + 1e-9) : 0;
-    if(pay > 0){
-      v += pay + sum(allExtras(y, P).filter(function(e){ return num(e.month) === m+1; }), function(e){ return Math.floor(num(e.amount) + 1e-9); });
-      fromLedger.push(mb.name);
-    } else {
-      var w = S.incomes.find(function(x){ return /^근로소득/.test(x.name) && x.owner === mb.name && expActiveInc(x, i); });
-      if(w) v += num(w.monthly);
-    }
-  });
-  return {v:v, src: fromLedger.length ? '급여 장부' + (fromLedger.length < S.members.length ? ' + 소득 항목' : '') : '소득 항목 기준'};
+  var srcs = {};
+  S.incomes.forEach(function(x){ if(isSalary(x) && expActiveInc(x, i)){ var l = ledgerMonthly(x.owner, i); srcs[l ? l.src : 'item'] = 1; } });
+  var src = srcs.actual ? '급여 장부 (이번 달 입력)' : srcs.avg ? '급여 장부 월 환산' : '소득 항목 기준';
+  return {v: incomeAt(i), src: src};
 }
 // 순자산 카드: 자산군별 금액을 그 색 글자로 (도표 없이)
 function assetText(t){
@@ -546,7 +560,8 @@ function viewFlow(){
   h += '<div class="card"><h2>월 소득 항목<span class="sp"></span><button class="btn sm" onclick="editIncome()">+ 추가</button></h2>';
   if(!S.incomes.length) h += '<div class="empty">연금·급여·월세처럼 매달 들어오는 돈</div>';
   S.incomes.slice().sort(function(a,b){ return (a.start||'').localeCompare(b.start||''); }).forEach(function(x){
-    h += '<div class="row" onclick="editIncome(\''+x.id+'\')"><div class="m"><div class="t">'+esc(x.name)+(x.owner?'<span class="tag">'+esc(x.owner)+'</span>':'')+'</div><div class="tiny">'+(x.start?ymDot(x.start):'지금')+' ~ '+(x.end?ymDot(x.end):'계속')+'</div></div><div class="v">월 '+fm(num(x.monthly))+'</div></div>';
+    var cur = incomeItemAt(x, Math.max(nowIdx(), ymIdx(x.start) || 0));
+    h += '<div class="row" onclick="editIncome(\''+x.id+'\')"><div class="m"><div class="t">'+esc(x.name)+(x.owner?'<span class="tag">'+esc(x.owner)+'</span>':'')+(isSalary(x)?'<span class="tag">급여 장부</span>':'')+'</div><div class="tiny">'+(x.start?ymDot(x.start):'지금')+' ~ '+(incEnd(x)!=null?ymDot(idxYm(incEnd(x)))+(!x.end?' (퇴직 월)':''):'계속')+'</div></div><div class="v">월 '+fm(cur)+'</div></div>';
   });
   h += '</div><div class="card"><h2>목돈 일정<span class="sp"></span><button class="btn sm" onclick="editLump()">+ 추가</button></h2>';
   if(!S.lumps.length) h += '<div class="empty">퇴직수당·적금 만기·교육비 같은 일회성 입출금</div>';
@@ -702,10 +717,12 @@ function editIncome(id){
   openModal('<h3>'+(id?'월 소득 수정':'월 소득 추가')+'</h3>'+
     '<label class="f">이름<input id="f_name" value="'+esc(x.name)+'" placeholder="예: 공무원연금"></label>'+
     '<label class="f">누구<select id="f_owner">'+ownerOptions(x.owner)+'</select></label>'+
-    '<label class="f">월 금액 (만원, 세후)<input id="f_monthly" type="number" inputmode="decimal" value="'+esc(x.monthly)+'"></label>'+
+    '<label class="chk"><input type="checkbox" id="f_sal" '+(isSalary(x)?'checked':'')+'> 수입지출 탭 급여 장부와 연동 (근로소득)</label>'+
+    '<label class="f">월 금액 (만원, 세후'+(isSalary(x)?' · 급여 장부가 비어 있을 때만 사용':'')+')<input id="f_monthly" type="number" inputmode="decimal" value="'+esc(x.monthly)+'"></label>'+
     '<div class="grid2"><label class="f">시작 (비우면 지금)<input id="f_start" type="month" value="'+esc(x.start)+'"></label>'+
     '<label class="f">끝 (비우면 계속)<input id="f_end" type="month" value="'+esc(x.end)+'"></label></div>'+
-    '<div class="btns"><button class="btn" onclick="upsertItem(\'incomes\',\''+(id||'')+'\',{name:fv(\'f_name\').trim()||\'소득\',owner:fv(\'f_owner\'),monthly:num(fv(\'f_monthly\')),start:fv(\'f_start\'),end:fv(\'f_end\')})">저장</button><button class="btn sub" onclick="closeModal()">취소</button>'+
+    (isSalary(x) ? '<div class="tiny" style="margin:-4px 0 10px">금액은 그달 급여 장부 입력값, 없으면 가장 최근 연도의 월 환산(수당 포함)을 씁니다</div>' : '')+
+    '<div class="btns"><button class="btn" onclick="upsertItem(\'incomes\',\''+(id||'')+'\',{name:fv(\'f_name\').trim()||\'소득\',owner:fv(\'f_owner\'),kind:document.getElementById(\'f_sal\').checked?\'salary\':\'\',monthly:num(fv(\'f_monthly\')),start:fv(\'f_start\'),end:fv(\'f_end\')})">저장</button><button class="btn sub" onclick="closeModal()">취소</button>'+
     (id?'<span style="flex:1"></span><button class="btn bad" onclick="delItem(\'incomes\',\''+id+'\')">삭제</button>':'')+'</div>');
 }
 function editLump(id){
@@ -1074,7 +1091,7 @@ function viewMoney(){
       '</div>';
   });
   // 저축 여력
-  var other = sum(S.incomes.filter(function(x){ return !/^근로소득/.test(x.name) && expActiveInc(x, now); }), function(x){ return num(x.monthly); });
+  var other = sum(S.incomes.filter(function(x){ return !isSalary(x) && expActiveInc(x, now); }), function(x){ return num(x.monthly); });
   var exp = expenseAt(now), saving = sum(S.expenses.filter(function(x){ return x.cat === 'saving' && expActive(x, now); }), function(x){ return num(x.monthly); });
   var dc = debtCostAt(now);
   var inM = hh/12 + other, cap = inM - exp - dc;
@@ -1085,13 +1102,13 @@ function viewMoney(){
     (dc ? '<tr><td>대출 이자·상환</td><td class="neg">−'+fm(dc)+'</td></tr>' : '')+
     '<tr><th style="text-align:left">월 저축 여력</th><th class="'+(cap<0?'neg':'pos')+'" style="font-size:var(--f-md)">'+fm(cap)+'</th></tr></table>'+
     (saving ? '<div class="tiny" style="margin-top:6px">저축 분류 '+fm(saving)+'은 지출에서 빼고 저축 여력에 포함됩니다</div>' : '')+
-    '<div class="btns"><button class="btn sm" onclick="applySaving('+Math.round(cap)+')">시뮬레이션 \'그 전 월 저축액\'에 반영</button><button class="btn sub sm" onclick="applySalaryIncome('+y+')">현금흐름 근로소득에 반영</button></div>'+
+    '<div class="btns"><button class="btn sm" onclick="applySaving('+Math.round(cap)+')">시뮬레이션 \'그 전 월 저축액\'에 반영</button>'+(S.members.some(function(m){ return !S.incomes.some(function(x){ return isSalary(x) && x.owner === m.name; }); }) ? '<button class="btn sub sm" onclick="applySalaryIncome('+y+')">현금흐름에 급여 항목 연결</button>' : '')+'</div>'+
     '<div class="tiny" style="margin-top:6px">지금 시뮬레이션 값: 월 '+fm(num(S.sim.saveBefore))+'</div></div>';
   // 고정지출
   h += viewExpenses();
   return h;
 }
-function expActiveInc(x, i){ var s = ymIdx(x.start), e = ymIdx(x.end); return (s == null || s <= i) && (e == null || i <= e); }
+function expActiveInc(x, i){ var s = ymIdx(x.start), e = incEnd(x); return (s == null || s <= i) && (e == null || i <= e); }
 function setSal(y, who, i, v){ var P = salOf(y, who); P.months[i] = String(v).trim() === '' ? null : manFloor(v); commit(); }
 // 본봉 입력 칸: 승급 전·후 본봉, 승급 월, 연가보상 일수 (+ 명절·연가 지급 월)
 // 급여 카드: 실수령·본봉·수당을 한 줄씩, 눌러서 세부 입력
@@ -1166,17 +1183,18 @@ function saveExtra(y, who, id){
 }
 function delExtra(y, who, id){ if(!confirm('삭제할까요?')) return; var P = salOf(y, who); P.extras = P.extras.filter(function(x){ return x.id !== id; }); commit(); openSalExtras(y, who); }
 function applySaving(v){ if(!confirm('시뮬레이션의 \'그 전 월 저축액\'을 '+fm(v)+'으로 바꿀까요?')) return; S.sim.saveBefore = v; commit(); toast('월 저축액 '+fm(v)+' 반영'); }
+// 급여 항목이 없는 사람에게 연동 항목을 만듦 (끝 월은 가족 정보의 퇴직 월 또는 정년)
 function applySalaryIncome(y){
-  var msg = [];
-  S.members.forEach(function(m){
-    var st = salStat(y, m.name); if(!st) return;
-    var it = S.incomes.find(function(x){ return /^근로소득/.test(x.name) && x.owner === m.name; });
-    var v = Math.round(st.monthly);
-    if(it){ it.monthly = v; } else { S.incomes.push({id:uid(), name:'근로소득 (실수령)', owner:m.name, monthly:v, start:'', end:''}); msg.push(m.name+' 항목 새로 만듦 — 끝 월을 지정하세요'); }
-    msg.unshift(m.name+' 월 '+fm(v));
+  var made = [];
+  S.members.forEach(function(m, k){
+    if(S.incomes.some(function(x){ return isSalary(x) && x.owner === m.name; })) return;
+    var f = S.family.find(function(x){ return x.rel === (k === 0 ? '본인' : '배우자'); });
+    var end = f && f.birth ? idxYm(retireIdx(f)) : '';
+    S.incomes.push({id:uid(), name:'근로소득 (급여 장부)', owner:m.name, kind:'salary', monthly:0, start:'', end:end});
+    made.push(m.name + (end ? ' ~'+ymDot(end) : ' (끝 월을 지정하세요)'));
   });
-  if(!msg.length){ alert(y+'년 급여 기록이 없습니다'); return; }
-  commit(); toast(msg.join(' · '));
+  if(!made.length) return;
+  commit(); toast('급여 항목 연결: '+made.join(', '));
 }
 
 function viewExpenses(){
@@ -1286,10 +1304,10 @@ function linkOptions(sel){
 }
 // 본인·배우자 ↔ 앱 구성원 이름 (소득 항목 명의)
 function memberOf(f){ return f.rel === '본인' ? (S.members[0]||{}).name : f.rel === '배우자' ? (S.members[1]||{}).name : null; }
-function workIncome(f){ var m = memberOf(f); return S.incomes.find(function(x){ return /^근로소득/.test(x.name) && x.owner === m; }); }
+function workIncome(f){ var m = memberOf(f); return S.incomes.find(function(x){ return isSalary(x) && x.owner === m; }); }
 function pensionIncome(f){ var m = memberOf(f); return S.incomes.filter(function(x){ return /연금/.test(x.name) && x.owner === m && x.start; }).sort(function(a,b){ return a.start.localeCompare(b.start); })[0]; }
 function retireIdx(f){
-  var w = workIncome(f); if(w && ymIdx(w.end) != null) return ymIdx(w.end);
+  var w = workIncome(f); if(w && ymIdx(w.end) != null) return ymIdx(w.end);   // 끝 월이 적혀 있을 때만 (incEnd 와 순환하지 않음)
   if(ymIdx(f.retire) != null) return ymIdx(f.retire);
   var p = f.birth.split('-').map(Number); return (p[0]+60)*12 + (p[1] <= 6 ? 5 : 11);   // 공무원 정년: 60세 되는 해 6월 또는 12월 말
 }
