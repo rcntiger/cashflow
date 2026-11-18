@@ -1202,7 +1202,7 @@ function viewMoney(){
     mm.push([esc(m.name)+' 월 환산', st ? fmx(st.monthly)+'만' : '–', '', y+'년 비정기 포함']);
     h += '<div class="card"><h2>'+esc(m.name)+' 급여 <span class="tiny" style="font-weight:400">'+y+'년</span><span class="sp"></span><button class="btn sub sm" onclick="openSalAuto('+y+',\''+esc(m.name)+'\')">⚙ 본봉 설정</button></h2>'+salRows(y, m.name, P, st)+
       (st ? '<div class="grid2" style="margin-top:10px"><div class="kv"><div class="k">연 환산 총수입</div><div class="v">'+fm(st.annual)+'</div></div><div class="kv"><div class="k">월 환산 (비정기 포함)</div><div class="v">'+fmx(st.monthly)+'만</div></div></div>' : '')+
-      salAutoLine(y, m.name, P)+'</div>';
+      '</div>';
   });
   h += '</div>';
   // 저축 여력
