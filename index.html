@@ -1262,7 +1262,7 @@ function openSalExtras(y, who){
   var list = P.extras.map(function(e){ return Object.assign({}, e, {off: on && AUTO_NAME.test(e.name)}); }).concat(autoExtras(y, P));
   openModal('<h3>'+w+' '+y+'년 기타 수당 및 세금 환급</h3>'+
     (list.length ? list.sort(function(a,b){ return num(a.month)-num(b.month); }).map(function(e){
-      if(e.auto) return '<div class="row" style="cursor:default"><div class="m"><div class="t">'+esc(e.name)+'<span class="tag">자동</span></div><div class="tiny">'+e.month+'월 · '+esc(e.how)+'</div></div><div class="v">'+fm(e.amount)+'</div></div>';
+      if(e.auto) return '<div class="row" style="cursor:default"><div class="m"><div class="t">'+esc(e.name)+'<span class="tag">자동계산</span></div><div class="tiny">'+e.month+'월 · '+esc(e.how)+'</div></div><div class="v">'+fm(e.amount)+'</div></div>';
       return '<div class="row" onclick="editExtra('+y+',\''+w+'\',\''+e.id+'\')" style="'+(e.off?'opacity:.45':'')+'"><div class="m"><div class="t" style="'+(e.off?'text-decoration:line-through':'')+'">'+esc(e.name)+'</div><div class="tiny">'+(e.month?e.month+'월':'')+(e.off?' · 자동 계산으로 대체 (합계에서 뺌)':'')+'</div></div><div class="v">'+fm(Math.floor(num(e.amount)+1e-9))+'</div></div>'; }).join('')
       : '<div class="empty">성과상여금·연말정산 환급·초과근무수당 등</div>')+
     '<div class="btns"><button class="btn" onclick="editExtra('+y+',\''+w+'\')">+ 추가</button><button class="btn sub" onclick="closeModal()">닫기</button></div>');
