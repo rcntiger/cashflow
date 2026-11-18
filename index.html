@@ -1194,7 +1194,7 @@ function viewExpenses(){
   });
   if(S.expenses.length){
     var pts = [now, (cy+2)*12, (cy+5)*12, life, life != null ? life+24 : null, (cy+15)*12, (cy+20)*12].filter(function(v,i,a){ return v != null && a.indexOf(v) === i; }).sort(function(a,b){ return a-b; });
-    h += '<div style="margin-top:12px"><table><tr><th>시점</th><th>월 고정지출</th></tr>'+pts.map(function(i){ return '<tr><td style="white-space:normal">'+ymDot(idxYm(i))+(agesAt(i)?'<div class="tiny">'+agesAt(i).replace(/^ · /,'')+'</div>':'')+'</td><td>'+fm(expenseAt(i))+'</td></tr>'; }).join('')+'</table></div>'+
+    h += '<div style="margin-top:12px"><table><tr><th>시기</th><th>예상 월 고정지출</th></tr>'+pts.map(function(i){ return '<tr><td style="white-space:normal">'+ymDot(idxYm(i))+(agesAt(i)?'<div class="tiny">'+agesAt(i).replace(/^ · /,'')+'</div>':'')+'</td><td>'+fm(expenseAt(i))+'</td></tr>'; }).join('')+'</table></div>'+
       '<div class="tiny" style="margin-top:6px">저축 분류는 합계에서 빠집니다. 이 목록으로 은퇴 후 생활비를 계산하려면 시뮬 탭에서 \'고정지출 목록\'을 고르세요'+(S.sim.spendMode==='expenses'?' (사용 중)':'')+'</div>';
   }
   return h + '</div>';
