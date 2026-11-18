@@ -1225,7 +1225,7 @@ function setSal(y, who, i, v){ var P = salOf(y, who); P.months[i] = String(v).tr
 function salAutoLine(y, who, P){
   var c = autoCfg(P, y), on = autoOn(P);
   return '<div class="row" style="margin-top:10px;border-top:1px solid var(--bd);border-bottom:0" onclick="openSalAuto('+y+',\''+esc(who)+'\')"><div class="m"><div class="tiny">⚙ '+
-    (on ? '본봉 '+c.base1+(c.base2 ? ' → '+c.step+'월 '+c.base2 : '')+(c.days ? ' · 연가 '+c.days+'일' : '')+'<br>명절휴가비·연가보상비 자동계산' : '본봉을 넣으면 명절휴가비·연가보상비가 자동 계산됩니다')+
+    (on ? '본봉 '+c.base1+(c.base2 ? ' → '+c.step+'월 '+c.base2 : '')+(c.days ? ' · 연가 '+c.days+'일' : '')+'<br>명절휴가비·연가보상비 자동계산' : '본봉을 넣으면 명절휴가비·연가보상비 자동계산')+
     '</div></div><div class="v tiny">›</div></div>';
 }
 function salRows(y, who, P, st){
@@ -1234,7 +1234,7 @@ function salRows(y, who, P, st){
   var ex = allExtras(y, P), exSum = sum(ex, function(e){ return Math.floor(num(e.amount) + 1e-9); });
   var row = function(title, sub, val, fn){ return '<div class="row" onclick="'+fn+'('+y+',\''+w+'\')"><div class="m"><div class="t">'+title+'</div><div class="tiny">'+sub+'</div></div><div class="v">'+val+' ›</div></div>'; };
   return row('실수령액', filled ? filled+'개월 입력 · 월 평균' : '눌러서 월별 입력', filled ? fmx(st ? st.avg : 0)+'만' : '', 'openSalMonths')+
-    row('기타 수당 및 세금 환급', ex.length ? ex.length+'건'+(on ? ' (자동 '+autoExtras(y, P).length+'건 포함)' : '') : '성과상여금·연말정산 환급 등', ex.length ? fm(exSum) : '', 'openSalExtras');
+    row('기타 수당 및 세금 환급', ex.length ? ex.length+'건'+(on ? ' (자동계산 '+autoExtras(y, P).length+'건 포함)' : '') : '성과상여금·연말정산 환급 등', ex.length ? fm(exSum) : '', 'openSalExtras');
 }
 function openSalMonths(y, who){
   var P = salOf(y, who), w = esc(who);
@@ -1247,7 +1247,7 @@ function openSalMonths(y, who){
 function openSalAuto(y, who){
   var P = salOf(y, who);
   openModal('<h3>'+esc(who)+' '+y+'년 본봉</h3>'+autoBox(y, who, P)+
-    '<div class="tiny" style="margin:-4px 0 10px">입력하면 바로 저장되고, 명절휴가비·연가보상비가 \'기타 수당 및 세금 환급\'에 자동으로 들어갑니다</div>'+
+    '<div class="tiny" style="margin:-4px 0 10px">입력하면 바로 저장됩니다. 명절휴가비·연가보상비 자동계산 결과는 \'기타 수당 및 세금 환급\'에 반영됩니다</div>'+
     '<div class="btns"><button class="btn" onclick="closeModal()">완료</button></div>');
 }
 function openSalExtras(y, who){
@@ -1255,8 +1255,8 @@ function openSalExtras(y, who){
   var list = P.extras.map(function(e){ return Object.assign({}, e, {off: on && AUTO_NAME.test(e.name)}); }).concat(autoExtras(y, P));
   openModal('<h3>'+w+' '+y+'년 기타 수당 및 세금 환급</h3>'+
     (list.length ? list.sort(function(a,b){ return num(a.month)-num(b.month); }).map(function(e){
-      if(e.auto) return '<div class="row" style="cursor:default"><div class="m"><div class="t">'+esc(e.name)+'<span class="tag">자동</span></div><div class="tiny">'+e.month+'월 · '+esc(e.how)+'</div></div><div class="v">'+fm(e.amount)+'</div></div>';
-      return '<div class="row" onclick="editExtra('+y+',\''+w+'\',\''+e.id+'\')" style="'+(e.off?'opacity:.45':'')+'"><div class="m"><div class="t" style="'+(e.off?'text-decoration:line-through':'')+'">'+esc(e.name)+'</div><div class="tiny">'+(e.month?e.month+'월':'')+(e.off?' · 자동 계산으로 대체 (합계에서 뺌)':'')+'</div></div><div class="v">'+fm(Math.floor(num(e.amount)+1e-9))+'</div></div>'; }).join('')
+      if(e.auto) return '<div class="row" style="cursor:default"><div class="m"><div class="t">'+esc(e.name)+'<span class="tag">자동계산</span></div><div class="tiny">'+e.month+'월 · '+esc(e.how)+'</div></div><div class="v">'+fm(e.amount)+'</div></div>';
+      return '<div class="row" onclick="editExtra('+y+',\''+w+'\',\''+e.id+'\')" style="'+(e.off?'opacity:.45':'')+'"><div class="m"><div class="t" style="'+(e.off?'text-decoration:line-through':'')+'">'+esc(e.name)+'</div><div class="tiny">'+(e.month?e.month+'월':'')+(e.off?' · 자동계산으로 대체 (합계에서 뺌)':'')+'</div></div><div class="v">'+fm(Math.floor(num(e.amount)+1e-9))+'</div></div>'; }).join('')
       : '<div class="empty">성과상여금·연말정산 환급·초과근무수당 등</div>')+
     '<div class="btns"><button class="btn" onclick="editExtra('+y+',\''+w+'\')">+ 추가</button><button class="btn sub" onclick="closeModal()">닫기</button></div>');
 }
