@@ -1159,27 +1159,40 @@ function applySalaryIncome(y){
 
 function viewExpenses(){
   var now = nowIdx(), cy = Math.floor(now/12), life = ymIdx(S.sim.lifeStart);
-  var h = '<div class="card"><h2>월 고정지출<span class="sp"></span><button class="btn sm" onclick="editExpense()">+ 추가</button></h2>';
+  var total = expenseAt(now);
+  var h = '<div class="card"><h2>월 고정지출<span class="sp"></span><span class="num" style="font-weight:500">'+fm(total)+'</span></h2>';
   if(!S.expenses.length) h += '<div class="empty">관리비·보험·학원비처럼 매달 나가는 돈. 끝나는 달을 넣으면 은퇴 후 생활비가 자동으로 계산됩니다.</div>';
+  // 큰 항목(분류)만 보여 주고, 누르면 세부 항목을 보고 고침
   Object.keys(EXP_CATS).forEach(function(c){
-    var list = S.expenses.filter(function(x){ return x.cat === c; }); if(!list.length) return;
-    var act = sum(list.filter(function(x){ return expActive(x, now); }), function(x){ return num(x.monthly); });
-    h += '<div class="grp"><span>'+EXP_CATS[c]+'</span><span class="num">'+fm(act)+'</span></div>';
-    list.forEach(function(x){
-      var on = expActive(x, now);
-      h += '<div class="row" onclick="editExpense(\''+x.id+'\')" style="'+(on?'':'opacity:.5')+'"><div class="m"><div class="t">'+esc(x.name)+(x.owner?'<span class="tag">'+esc(x.owner)+'</span>':'')+'</div>'+
-        '<div class="tiny">'+(x.start?ymDot(x.start):'지금')+' ~ '+(expEnd(x)!=null?ymDot(idxYm(expEnd(x))):'계속')+(linkLabel(x)?' · '+linkLabel(x):'')+(x.note?' · '+esc(x.note):'')+'</div></div><div class="v">'+fm(num(x.monthly))+'</div></div>';
-    });
+    var list = S.expenses.filter(function(x){ return x.cat === c; });
+    var act = list.filter(function(x){ return expActive(x, now); });
+    var amt = sum(act, function(x){ return num(x.monthly); });
+    var ends = list.map(expEnd).filter(function(v){ return v != null && v >= now; }).sort(function(a,b){ return a-b; });
+    h += '<div class="row" onclick="openExpCat(\''+c+'\')"><div class="m"><div class="t">'+EXP_CATS[c]+'</div>'+
+      '<div class="tiny">'+(list.length ? act.length+'건'+(ends.length?' · '+ymDot(idxYm(ends[0]))+'부터 줄어듦':'') : '없음 · 눌러서 추가')+'</div></div>'+
+      '<div class="v'+(c==='saving'?' tiny':'')+'">'+(list.length ? fm(amt) : '')+' ›</div></div>';
   });
   if(S.expenses.length){
     var pts = [now, (cy+2)*12, (cy+5)*12, life, life != null ? life+24 : null, (cy+15)*12, (cy+20)*12].filter(function(v,i,a){ return v != null && a.indexOf(v) === i; }).sort(function(a,b){ return a-b; });
     h += '<div style="margin-top:12px"><table><tr><th>시점</th><th>월 고정지출</th></tr>'+pts.map(function(i){ return '<tr><td style="white-space:normal">'+ymDot(idxYm(i))+(agesAt(i)?'<div class="tiny">'+agesAt(i).replace(/^ · /,'')+'</div>':'')+'</td><td>'+fm(expenseAt(i))+'</td></tr>'; }).join('')+'</table></div>'+
-      '<div class="tiny" style="margin-top:6px">이 목록으로 은퇴 후 생활비를 계산하려면 시뮬 탭에서 \'고정지출 목록\'을 고르세요'+(S.sim.spendMode==='expenses'?' (사용 중)':'')+'</div>';
+      '<div class="tiny" style="margin-top:6px">저축 분류는 합계에서 빠집니다. 이 목록으로 은퇴 후 생활비를 계산하려면 시뮬 탭에서 \'고정지출 목록\'을 고르세요'+(S.sim.spendMode==='expenses'?' (사용 중)':'')+'</div>';
   }
   return h + '</div>';
 }
-function editExpense(id){
-  var x = S.expenses.find(function(e){ return e.id === id; }) || {cat:'living'};
+// 분류 시트: 세부 항목 목록 + 추가
+function openExpCat(c){
+  var now = nowIdx(), list = S.expenses.filter(function(x){ return x.cat === c; });
+  var amt = sum(list.filter(function(x){ return expActive(x, now); }), function(x){ return num(x.monthly); });
+  openModal('<h3>'+EXP_CATS[c]+' <span class="num" style="font-weight:500">'+fm(amt)+'</span></h3>'+
+    (list.length ? list.map(function(x){
+      var on = expActive(x, now);
+      return '<div class="row" onclick="editExpense(\''+x.id+'\')" style="'+(on?'':'opacity:.5')+'"><div class="m"><div class="t">'+esc(x.name)+(x.owner?'<span class="tag">'+esc(x.owner)+'</span>':'')+'</div>'+
+        '<div class="tiny">'+(x.start?ymDot(x.start):'지금')+' ~ '+(expEnd(x)!=null?ymDot(idxYm(expEnd(x))):'계속')+(linkLabel(x)?' · '+linkLabel(x):'')+(x.note?' · '+esc(x.note):'')+'</div></div><div class="v">'+fm(num(x.monthly))+'</div></div>'; }).join('')
+      : '<div class="empty">아직 항목이 없습니다</div>')+
+    '<div class="btns"><button class="btn" onclick="editExpense(\'\',\''+c+'\')">+ '+EXP_CATS[c]+' 항목 추가</button><button class="btn sub" onclick="closeModal()">닫기</button></div>');
+}
+function editExpense(id, cat){
+  var x = S.expenses.find(function(e){ return e.id === id; }) || {cat:cat || 'living'};
   openModal('<h3>'+(id?'고정지출 수정':'고정지출 추가')+'</h3>'+
     '<label class="f">이름<input id="f_name" value="'+esc(x.name)+'" placeholder="예: 재준 수학 학원"></label>'+
     '<div class="grid2"><label class="f">분류<select id="f_cat">'+Object.keys(EXP_CATS).map(function(c){ return '<option value="'+c+'" '+(c===x.cat?'selected':'')+'>'+EXP_CATS[c]+'</option>'; }).join('')+'</select></label>'+
@@ -1190,8 +1203,19 @@ function editExpense(id){
     '<label class="f">끝 월을 자녀 일정에 연결 (선택)<select id="f_link">'+linkOptions(x.link)+'</select></label>'+
     '<label class="f">메모<input id="f_note" value="'+esc(x.note)+'" placeholder="예: 고교 졸업까지"></label>'+
     '<div class="tiny" style="margin:-4px 0 10px">재산세처럼 1년에 몇 번 내는 돈은 연간 합계 ÷ 12로 넣으세요</div>'+
-    '<div class="btns"><button class="btn" onclick="upsertItem(\'expenses\',\''+(id||'')+'\',{name:fv(\'f_name\').trim()||\'지출\',cat:fv(\'f_cat\'),owner:fv(\'f_owner\'),monthly:toMan(fv(\'f_monthly\')),start:fv(\'f_start\'),end:fv(\'f_end\'),link:fv(\'f_link\'),note:fv(\'f_note\').trim()})">저장</button><button class="btn sub" onclick="closeModal()">취소</button>'+
-    (id?'<span style="flex:1"></span><button class="btn bad" onclick="delItem(\'expenses\',\''+id+'\')">삭제</button>':'')+'</div>');
+    '<div class="btns"><button class="btn" onclick="saveExpense(\''+(id||'')+'\')">저장</button><button class="btn sub" onclick="openExpCat(\''+x.cat+'\')">취소</button>'+
+    (id?'<span style="flex:1"></span><button class="btn bad" onclick="delExpense(\''+id+'\')">삭제</button>':'')+'</div>');
+}
+// 저장·삭제 뒤에는 그 분류 목록으로 돌아감
+function saveExpense(id){
+  var o = {name:fv('f_name').trim()||'지출', cat:fv('f_cat'), owner:fv('f_owner'), monthly:toMan(fv('f_monthly')), start:fv('f_start'), end:fv('f_end'), link:fv('f_link'), note:fv('f_note').trim()};
+  if(id) Object.assign(S.expenses.find(function(x){ return x.id === id; }), o); else { o.id = uid(); S.expenses.push(o); }
+  commit(); openExpCat(o.cat);
+}
+function delExpense(id){
+  if(!confirm('삭제할까요?')) return;
+  var x = S.expenses.find(function(e){ return e.id === id; }), c = x ? x.cat : 'living';
+  S.expenses = S.expenses.filter(function(e){ return e.id !== id; }); commit(); openExpCat(c);
 }
 
 /* ════════ 생애 타임라인 ════════ */
