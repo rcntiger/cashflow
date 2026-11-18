@@ -180,7 +180,7 @@ var TABS = [
   {id:'sim', name:'시뮬', ic:'↗'},
   {id:'todo', name:'할 일', ic:'✓'}
 ];
-var BUCKETS = {reserve:'① 생활 예비', gap:'② 공백 대비', growth:'③ 성장'};
+var BUCKETS = {reserve:'① 생활 예비', gap:'② 공백 대비', growth:'③ 장기투자'};
 var BUCKET_DESC = {reserve:'비상금·교육비 — 예금·MMF', gap:'소득이 생활비보다 적은 기간용 — 공제회 → 예금·단기채', growth:'나머지 전부 — 지수 ETF (비중은 리밸런서)'};
 var BUCKET_COLOR = {reserve:'var(--c5)', gap:'var(--c2)', growth:'var(--c0)'};
 function defaultBucket(cat){ return cat === 'cash' ? 'reserve' : (FIN_CATS.indexOf(cat) >= 0 ? 'growth' : ''); }
@@ -1657,7 +1657,7 @@ function viewAlloc(){
   h += kpis([[BUCKETS.reserve, fm(cur.reserve), '', '목표 '+fm(bt.reserve)], [BUCKETS.gap, fm(cur.gap), '', '목표 '+fm(bt.gap)], [BUCKETS.growth, fm(cur.growth), '', fin ? '금융자산의 '+Math.round(cur.growth/fin*100)+'%' : ''], ['금융자산 합계', fm(fin)]]);
   if(run){
     h += '<div class="alert">'+(run.endless
-      ? '생활비 시작 뒤로 <b>소득이 생활비보다 계속 적습니다</b>. ② 공백 대비 대신 ③ 성장에서 매년 꺼내 쓰는 구조입니다. 생활비를 다시 확인하세요.'
+      ? '생활비 시작 뒤로 <b>소득이 생활비보다 계속 적습니다</b>. ② 공백 대비 대신 ③ 장기투자에서 매년 꺼내 쓰는 구조입니다. 생활비를 다시 확인하세요.'
       : '<b>공백기 '+ymDot(idxYm(run.from))+'~'+ymDot(idxYm(run.to))+'</b> ('+(run.to-run.from+1)+'개월): 월 평균 '+fm(run.total/(run.to-run.from+1))+'씩, 합계 <b>'+fm(run.total)+'</b>이 모자랍니다.')+'</div>';
   }
 
@@ -1707,7 +1707,7 @@ function editMove(id){
   var m = S.moves.find(function(x){ return x.id === id; }) || {};
   openModal('<h3>'+(id?'이동 계획 수정':'이동 계획 추가')+'</h3>'+
     '<label class="f">시기<input id="f_month" type="month" value="'+esc(m.month)+'"></label>'+
-    '<label class="f">내용<input id="f_text" value="'+esc(m.text)+'" placeholder="예: 공제회(본인) 만기 → ③ 성장 ETF 매수"></label>'+
+    '<label class="f">내용<input id="f_text" value="'+esc(m.text)+'" placeholder="예: 공제회(본인) 만기 → ③ 장기투자 ETF 매수"></label>'+
     '<div class="btns"><button class="btn" onclick="upsertItem(\'moves\',\''+(id||'')+'\',{month:fv(\'f_month\'),text:fv(\'f_text\').trim()||\'이동\'})">저장</button><button class="btn sub" onclick="closeModal()">취소</button>'+
     (id?'<span style="flex:1"></span><button class="btn bad" onclick="delItem(\'moves\',\''+id+'\')">삭제</button>':'')+'</div>');
 }
