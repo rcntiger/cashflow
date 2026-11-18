@@ -240,7 +240,8 @@ function lumpAt(i){
 // 그 달에 해당하는 목돈인지 (매년 반복이면 같은 달, 반복 끝까지)
 function lumpHits(x, i){
   var s = ymIdx(x.month); if(s == null) return false;
-  if(!x.repeat) return s === i;
+  if(!x.repeat) return !x.done && s === i;
+  if(x.ack != null && i <= x.ack) return false;
   var e = ymIdx(x.until);
   return i >= s && (e == null || i <= e) && (i - s) % 12 === 0;
 }
@@ -396,6 +397,61 @@ function assetBar(t){
   var leg = cats.map(function(c){ return '<span style="white-space:nowrap"><i style="background:'+CAT_COLOR[c]+'"></i>'+CATS[c]+' <b class="num" style="color:var(--t1);font-weight:500">'+fm(t.byCat[c])+'</b></span>'; }).join('');
   return '<div style="margin-top:14px"><div style="display:flex;height:14px;border-radius:99px;overflow:hidden;gap:2px">'+bar+'</div>'+debt+'<div class="legend">'+leg+'</div></div>';
 }
+/* ── 지난 목돈 알림: 날짜가 된 목돈을 자산에 반영·미루기·완료 처리 ── */
+function dueLumps(){
+  var now = nowIdx(), out = [];
+  S.lumps.forEach(function(l){
+    var s = ymIdx(l.month); if(s == null) return;
+    if(!l.repeat){ if(!l.done && s <= now) out.push({l:l, i:s}); return; }
+    var e = ymIdx(l.until), i = s, last = null;                       // 반복: 확인 안 한 가장 최근 회차
+    while(i <= now && (e == null || i <= e)){ if(l.ack == null || i > l.ack) last = i; i += 12; }
+    if(last != null) out.push({l:l, i:last});
+  });
+  return out.sort(function(a,b){ return a.i - b.i; });
+}
+function dueLumpsCard(){
+  var d = dueLumps(); if(!d.length) return '';
+  return '<div class="card" style="border-color:var(--warn)"><h2><span class="wrn">●</span> 날짜가 된 목돈 '+d.length+'건</h2>'+
+    d.map(function(x){ var a = num(x.l.amount);
+      return '<div style="padding:10px 0;border-top:1px solid var(--bd)"><div style="display:flex;gap:8px"><div class="m" style="flex:1"><div class="t">'+esc(x.l.name)+'</div><div class="tiny">'+ymDot(idxYm(x.i))+' · '+(a>=0?'받으셨나요?':'쓰셨나요?')+'</div></div><div class="v num '+(a<0?'neg':'pos')+'">'+(a>=0?'+':'')+fm(a)+'</div></div>'+
+        '<div class="btns" style="margin-top:8px"><button class="btn sm" onclick="dueApply(\''+x.l.id+'\','+x.i+')">자산에 반영</button><button class="btn sub sm" onclick="dueDelay(\''+x.l.id+'\','+x.i+')">날짜 미루기</button><button class="btn sub sm" onclick="dueDone(\''+x.l.id+'\','+x.i+')">반영 안 함</button></div></div>'; }).join('')+
+    '<div class="tiny" style="margin-top:6px">반영해야 순자산과 시뮬레이션이 맞습니다. 지난 목돈은 시뮬레이션에서 빠지기 때문입니다.</div></div>';
+}
+function markLump(l, i, note){
+  if(l.repeat) l.ack = i; else { l.done = true; l.doneNote = note || ''; }
+}
+function dueApply(id, i){
+  var l = S.lumps.find(function(x){ return x.id === id; }), a = num(l.amount);
+  var opts = S.assets.filter(function(x){ return FIN_CATS.indexOf(x.cat) >= 0; }).map(function(x){ return '<option value="'+x.id+'">'+esc(assetLabel(x))+' · '+fm(num(x.value))+'</option>'; }).join('');
+  openModal('<h3>'+esc(l.name)+' 반영</h3>'+
+    '<label class="f">'+(a>=0?'넣은 자산':'빠져나간 자산')+'<select id="f_to">'+opts+'<option value="new">+ 새 현금·예금 자산</option></select></label>'+
+    '<label class="f">실제 금액 (만원, '+(a>=0?'받은':'쓴')+' 금액)<input id="f_amt" type="number" inputmode="decimal" value="'+Math.abs(a)+'"></label>'+
+    '<div class="tiny" style="margin-bottom:10px">자산 금액에 '+(a>=0?'더하고':'빼고')+' 이 목돈은 완료로 표시합니다.</div>'+
+    '<div class="btns"><button class="btn" onclick="dueApplySave(\''+id+'\','+i+')">반영</button><button class="btn sub" onclick="closeModal()">취소</button></div>');
+}
+function dueApplySave(id, i){
+  var l = S.lumps.find(function(x){ return x.id === id; }), sign = num(l.amount) >= 0 ? 1 : -1, amt = Math.abs(num(fv('f_amt'))) * sign, to = fv('f_to'), asset;
+  if(to === 'new'){ asset = {id:uid(), name:l.name, cat:'cash', owner:'', value:0, note:'', bucket:'reserve'}; S.assets.push(asset); }
+  else asset = S.assets.find(function(x){ return x.id === to; });
+  var old = num(asset.value); asset.value = Math.round((old + amt)*100)/100;
+  markLump(l, i, asset.name+'에 반영');
+  closeModal(); commit(); toast(asset.name+' '+fm(old)+' → '+fm(asset.value));
+}
+function dueDelay(id, i){
+  var l = S.lumps.find(function(x){ return x.id === id; });
+  openModal('<h3>'+esc(l.name)+' 날짜 미루기</h3>'+monthField('f_nm', '새 예정 월', idxYm(Math.max(i, nowIdx()) + 1))+
+    '<div class="btns"><button class="btn" onclick="dueDelaySave(\''+id+'\')">저장</button><button class="btn sub" onclick="closeModal()">취소</button></div>');
+}
+function dueDelaySave(id){
+  var l = S.lumps.find(function(x){ return x.id === id; }), v = fv('f_nm'); if(!v) return;
+  if(l.repeat){ alert('반복 목돈은 이번 회차만 미룰 수 없습니다. [반영 안 함]을 누른 뒤 따로 목돈을 추가하세요.'); return; }
+  l.month = v; closeModal(); commit(); toast(l.name+' → '+ymDot(v));
+}
+function dueDone(id, i){
+  var l = S.lumps.find(function(x){ return x.id === id; });
+  if(!confirm(l.name+'을(를) 자산 변동 없이 완료로 표시할까요?')) return;
+  markLump(l, i, '반영 안 함'); commit();
+}
 function go(t){ TAB = t; localStorage.setItem('cf_tab', t); render(); window.scrollTo(0,0); }
 
 function viewDash(){
@@ -414,6 +470,7 @@ function viewDash(){
   } else if(OWNER){
     delta = '<div class="tiny" style="margin-top:2px">'+esc(OWNER)+' 명의만 · 추이와 기록은 가계 전체 기준</div>';
   }
+  h += dueLumpsCard();
   if(!S.assets.length) h += '<div class="alert">아직 기록이 없습니다. <b>자산</b> 탭에서 입력하거나, ⚙ 설정에서 JSON 파일을 가져오세요.</div>';
   h += '<div class="card"><div class="muted">순자산</div><div class="big num">'+fm(t.net)+(HIDE?'':'원')+'</div>'+delta+
     '<div class="grid2" style="margin-top:12px">'+
@@ -489,7 +546,7 @@ function viewFlow(){
   if(!S.lumps.length) h += '<div class="empty">퇴직수당·적금 만기·교육비 같은 일회성 입출금</div>';
   S.lumps.slice().sort(function(a,b){ return (a.month||'').localeCompare(b.month||''); }).forEach(function(x){
     var a = num(x.amount);
-    h += '<div class="row" onclick="editLump(\''+x.id+'\')"><div class="m"><div class="t">'+esc(x.name)+'</div><div class="tiny">'+(x.repeat ? '매년 '+(+x.month.slice(5))+'월 · '+ymDot(x.month)+'~'+(x.until?ymDot(x.until):'') : ymDot(x.month))+agesAt(ymIdx(x.month))+(x.bucket?' · '+BUCKETS[x.bucket]:'')+(x.note?' · '+esc(x.note):'')+'</div></div><div class="v '+(a<0?'neg':'pos')+'">'+(a>=0?'+':'')+fm(a)+'</div></div>';
+    h += '<div class="row" onclick="editLump(\''+x.id+'\')" style="'+(x.done?'opacity:.5':'')+'"><div class="m"><div class="t">'+esc(x.name)+(x.done?'<span class="tag">완료'+(x.doneNote?' · '+esc(x.doneNote):'')+'</span>':'')+'</div><div class="tiny">'+(x.repeat ? '매년 '+(+x.month.slice(5))+'월 · '+ymDot(x.month)+'~'+(x.until?ymDot(x.until):'') : ymDot(x.month))+agesAt(ymIdx(x.month))+(x.bucket?' · '+BUCKETS[x.bucket]:'')+(x.note?' · '+esc(x.note):'')+'</div></div><div class="v '+(a<0?'neg':'pos')+'">'+(a>=0?'+':'')+fm(a)+'</div></div>';
   });
   h += '</div>';
   return h;
@@ -637,9 +694,10 @@ function editLump(id){
     '<label class="chk"><input type="checkbox" id="f_repeat" '+(x.repeat?'checked':'')+' onchange="document.getElementById(\'repBox\').style.display=this.checked?\'block\':\'none\'"> 매년 같은 달에 반복</label>'+
     '<div id="repBox" style="display:'+(x.repeat?'block':'none')+'"><label class="f">반복 끝 (비우면 계속)<input id="f_until" type="month" value="'+esc(x.until)+'"></label>'+
     '<div class="tiny" style="margin:-4px 0 10px">은퇴 전 저축액에 이미 들어간 수당(명절휴가비 등)은 넣지 마세요. 두 번 계산됩니다.</div></div>'+
+    (x.done ? '<label class="chk"><input type="checkbox" id="f_done" checked> 완료 ('+esc(x.doneNote||'')+') — 끄면 다시 예정으로</label>' : '')+
     '<label class="f">들어갈 버킷 (배분 탭 예정액에 반영)<select id="f_bucket">'+bucketOptions(x.bucket || '', true)+'</select></label>'+
     '<label class="f">메모<input id="f_note" value="'+esc(x.note)+'"></label>'+
-    '<div class="btns"><button class="btn" onclick="upsertItem(\'lumps\',\''+(id||'')+'\',{name:fv(\'f_name\').trim()||\'목돈\',amount:num(fv(\'f_amount\')),month:fv(\'f_month\'),repeat:document.getElementById(\'f_repeat\').checked,until:fv(\'f_until\'),bucket:fv(\'f_bucket\'),note:fv(\'f_note\').trim()})">저장</button><button class="btn sub" onclick="closeModal()">취소</button>'+
+    '<div class="btns"><button class="btn" onclick="upsertItem(\'lumps\',\''+(id||'')+'\',{name:fv(\'f_name\').trim()||\'목돈\',amount:num(fv(\'f_amount\')),month:fv(\'f_month\'),repeat:document.getElementById(\'f_repeat\').checked,until:fv(\'f_until\'),bucket:fv(\'f_bucket\'),done:!!(document.getElementById(\'f_done\')||{}).checked,note:fv(\'f_note\').trim()})">저장</button><button class="btn sub" onclick="closeModal()">취소</button>'+
     (id?'<span style="flex:1"></span><button class="btn bad" onclick="delItem(\'lumps\',\''+id+'\')">삭제</button>':'')+'</div>');
 }
 function upsertItem(list, id, o){
@@ -1187,7 +1245,7 @@ function timelineLanes(){
 }
 function timelineMarks(){
   var now = nowIdx(), out = [];
-  S.lumps.forEach(function(l){ var i = ymIdx(l.month); if(!l.repeat && i != null && i >= now) out.push({i:i, t:l.name, amt:num(l.amount), on:'editLump(\''+l.id+'\')'}); });
+  S.lumps.forEach(function(l){ var i = ymIdx(l.month); if(!l.repeat && !l.done && i != null && i >= now) out.push({i:i, t:l.name, amt:num(l.amount), on:'editLump(\''+l.id+'\')'}); });
   S.family.forEach(function(f){ if(f.rel === '자녀' && f.birth){ var p = f.birth.split('-').map(Number), i = (p[0]+19)*12 + p[1] - 1; if(i >= now) out.push({i:i, t:f.name+' 성년 (만 19세)', on:'tlChild(\''+f.id+'\')'}); } });
   return out.sort(function(a,b){ return a.i - b.i; });
 }
