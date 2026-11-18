@@ -659,7 +659,7 @@ function editAsset(id){
     '<label class="f">평가액 (만원)<input id="f_value" type="number" inputmode="decimal" value="'+esc(a.value)+'"></label>'+
     (a.src ? '<div class="tiny" style="margin:-4px 0 10px">'+esc(a.src)+(a.srcDetail?' · '+esc(a.srcDetail):'')+'</div>' : '')+
     '<label class="f">메모<input id="f_note" value="'+esc(a.note)+'"></label>'+
-    '<label class="f">버킷<select id="f_bucket">'+bucketOptions(id ? a.bucket : null)+'</select></label>'+
+    '<label class="f">목적별 예산<select id="f_bucket">'+bucketOptions(id ? a.bucket : null)+'</select></label>'+
     '<div id="reBox" style="display:'+(a.cat==='realestate'?'block':'none')+'"><div class="card" style="background:var(--s2)"><h2>시세 (아파트)</h2>'+
       '<div class="grid2"><label class="f">시군구 코드 5자리<input id="f_lawd" inputmode="numeric" maxlength="5" value="'+esc(a.lawd)+'" placeholder="예: 11545"></label>'+
       '<label class="f">전용면적 ㎡<input id="f_area" type="number" step="0.01" inputmode="decimal" value="'+esc(a.area)+'" placeholder="예: 84.97"></label></div>'+
@@ -716,7 +716,7 @@ function editLump(id){
     '<div id="repBox" style="display:'+(x.repeat?'block':'none')+'"><label class="f">반복 끝 (비우면 계속)<input id="f_until" type="month" value="'+esc(x.until)+'"></label>'+
     '<div class="tiny" style="margin:-4px 0 10px">은퇴 전 저축액에 이미 들어간 수당(명절휴가비 등)은 넣지 마세요. 두 번 계산됩니다.</div></div>'+
     (x.done ? '<label class="chk"><input type="checkbox" id="f_done" checked> 완료 ('+esc(x.doneNote||'')+') — 끄면 다시 예정으로</label>' : '')+
-    '<label class="f">들어갈 버킷 (배분 탭 예정액에 반영)<select id="f_bucket">'+bucketOptions(x.bucket || '', true)+'</select></label>'+
+    '<label class="f">들어갈 목적별 예산 (배분 탭 예정액에 반영)<select id="f_bucket">'+bucketOptions(x.bucket || '', true)+'</select></label>'+
     '<label class="f">메모<input id="f_note" value="'+esc(x.note)+'"></label>'+
     '<div class="btns"><button class="btn" onclick="upsertItem(\'lumps\',\''+(id||'')+'\',{name:fv(\'f_name\').trim()||\'목돈\',amount:num(fv(\'f_amount\')),month:fv(\'f_month\'),repeat:document.getElementById(\'f_repeat\').checked,until:fv(\'f_until\'),bucket:fv(\'f_bucket\'),done:!!(document.getElementById(\'f_done\')||{}).checked,note:fv(\'f_note\').trim()})">저장</button><button class="btn sub" onclick="closeModal()">취소</button>'+
     (id?'<span style="flex:1"></span><button class="btn bad" onclick="delItem(\'lumps\',\''+id+'\')">삭제</button>':'')+'</div>');
@@ -1501,11 +1501,11 @@ function viewAlloc(){
   S.lumps.forEach(function(l){ var i = lumpNext(l, now); if(l.bucket && planned[l.bucket] && i != null && i >= now && (!run || l.bucket !== 'gap' || i < run.from)) planned[l.bucket].push(l); });
   var fin = cur.reserve + cur.gap + cur.growth;
   var parts = Object.keys(BUCKETS).filter(function(k){ return cur[k] > 0; }).map(function(k){ return {n:BUCKETS[k], v:cur[k], c:BUCKET_COLOR[k]}; });
-  var h = ownerChips() + (OWNER ? '<div class="tiny" style="margin:-4px 2px 10px">목표 금액은 가계 전체 기준이라 명의별로 보면 부족해 보일 수 있습니다</div>' : '') + '<div class="card"><h2>버킷 3개</h2>'+donut(parts)+'<div class="tiny" style="margin-top:8px">버킷은 자산 탭에서 자산마다 지정합니다. 부동산은 버킷에 넣지 않습니다.</div></div>';
+  var h = ownerChips() + (OWNER ? '<div class="tiny" style="margin:-4px 2px 10px">목적별 예산의 목표 금액은 가계 전체 기준이라 명의별로 보면 부족해 보일 수 있습니다</div>' : '') + '<div class="card"><h2>목적별 예산 3개</h2>'+donut(parts)+'<div class="tiny" style="margin-top:8px">목적별 예산은 자산 탭에서 자산마다 지정합니다. 부동산은 넣지 않습니다.</div></div>';
 
   if(run){
     h += '<div class="alert">'+(run.endless
-      ? '생활비 시작 뒤로 <b>소득이 생활비보다 계속 적습니다</b>. 공백 버킷 대신 성장 버킷에서 매년 꺼내 쓰는 구조입니다. 생활비를 다시 확인하세요.'
+      ? '생활비 시작 뒤로 <b>소득이 생활비보다 계속 적습니다</b>. ② 공백 대비 대신 ③ 성장에서 매년 꺼내 쓰는 구조입니다. 생활비를 다시 확인하세요.'
       : '<b>공백기 '+ymDot(idxYm(run.from))+'~'+ymDot(idxYm(run.to))+'</b> ('+(run.to-run.from+1)+'개월): 월 평균 '+fm(run.total/(run.to-run.from+1))+'씩, 합계 <b>'+fm(run.total)+'</b>이 모자랍니다.')+'</div>';
   }
 
@@ -1536,7 +1536,7 @@ function viewAlloc(){
   if(run && !run.endless) items.push({auto:true, month:idxYm(run.from - 1), text:'② 공백 대비 자금 '+fm(bt.gap)+'을 예금·단기채로 옮기기 ('+ymDot(idxYm(run.from))+'부터 매달 꺼내 씀)'});
   items.sort(function(a,b){ return (a.month||'').localeCompare(b.month||''); });
   h += '<div class="card"><h2>이동 계획<span class="sp"></span><button class="btn sm" onclick="editMove()">+ 추가</button></h2>';
-  if(!items.length) h += '<div class="empty">버킷 사이에서 돈을 옮길 일정을 적어 둡니다</div>';
+  if(!items.length) h += '<div class="empty">목적별 예산 사이에서 돈을 옮길 일정을 적어 둡니다</div>';
   items.forEach(function(m){
     var i = ymIdx(m.month), soon = !m.done && i != null && i - now <= 12 && i >= now, past = !m.done && i != null && i < now;
     h += '<div class="chk-item '+(m.done?'done':'')+'">'+(m.auto?'<span style="width:22px;text-align:center" class="tiny">자동</span>':'<input type="checkbox" '+(m.done?'checked':'')+' onchange="toggleMove(\''+m.id+'\')">')+
