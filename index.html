@@ -477,6 +477,7 @@ function kpis(arr){
 }
 function ownerChips(){
   var opts = [''].concat(S.members.map(function(m){ return m.name; }), ['공동']);
+  if(OWNER && opts.indexOf(OWNER) < 0){ OWNER = ''; try{ localStorage.setItem('cf_owner', ''); }catch(e){} }
   return '<div class="chips">' + opts.map(function(o){ return '<button class="chip '+(o===OWNER?'on':'')+'" onclick="setOwner(\''+esc(o)+'\')">'+(o?esc(nm(o)):'전체')+'</button>'; }).join('') + '</div>';
 }
 function setOwner(o){ OWNER = o; localStorage.setItem('cf_owner', o); render(); }
@@ -903,7 +904,10 @@ function openSettings(){
     '<div class="btns"><button class="btn sub" onclick="closeModal()">닫기</button></div>');
 }
 function saveMembers(){
-  S.members = S.members.map(function(m,i){ return {name:m.name, nick:fv('m_n'+i).trim(), email:fv('m_e'+i).trim().toLowerCase()}; });
+  var next = S.members.map(function(m,i){ return {name:m.name, nick:fv('m_n'+i).trim(), email:fv('m_e'+i).trim().toLowerCase()}; });
+  var shown = next.map(function(m){ return m.nick || m.name; });
+  if(shown.some(function(n,i){ return shown.indexOf(n) !== i; }) || shown.indexOf('공동') >= 0){ alert('닉네임이 서로 같거나 \'공동\'입니다. 다르게 정해 주세요'); return; }
+  S.members = next;
   closeModal(); commit(); toast('구성원을 저장했습니다');
 }
 function setTheme(t){ document.documentElement.dataset.theme = t; localStorage.setItem('cf_theme', t);
@@ -1125,7 +1129,7 @@ async function openRbMap(){
     '<div class="btns"><button class="btn" onclick="saveRbMap()">저장하고 불러오기</button><button class="btn sub" onclick="closeModal()">취소</button></div>');
 }
 // 자산 이름에 명의가 이미 들어 있으면 한 번만 표시
-function assetLabel(a){ return a.name + (a.owner && a.name.indexOf(a.owner) < 0 ? ' (' + a.owner + ')' : ''); }
+function assetLabel(a){ var o = a.owner ? (a.owner === '공동' ? '공동' : nm(a.owner)) : ''; return a.name + (o && a.name.indexOf(o) < 0 ? ' (' + o + ')' : ''); }
 // 리밸런서 계좌 이름으로 새 자산 만들기 (이름에 연금·IRP·퇴직이 있으면 연금계좌)
 function newAssetFromAccount(n){
   var cat = /연금|IRP|퇴직|DC|ISA/i.test(n) ? 'pension' : 'stock';
@@ -1382,7 +1386,7 @@ function applySalaryIncome(y){
     var f = S.family.find(function(x){ return x.rel === (k === 0 ? '본인' : '배우자'); });
     var end = f && f.birth ? idxYm(retireIdx(f)) : '';
     S.incomes.push({id:uid(), name:'근로소득 (급여 장부)', owner:m.name, kind:'salary', monthly:0, start:'', end:end});
-    made.push(m.name + (end ? ' ~'+ymDot(end) : ' (끝 월을 지정하세요)'));
+    made.push(nm(m.name) + (end ? ' ~'+ymDot(end) : ' (끝 월을 지정하세요)'));
   });
   if(!made.length) return;
   commit(); toast('급여 항목 연결: '+made.join(', '));
@@ -1676,13 +1680,25 @@ function saveAge(fid, y){
   var old = f.birth; f.birth = by + md;
   closeModal(); commit(); toast(famName(f)+' 생년 '+(old?old.slice(0,4):'-')+' → '+by+' (이후 나이 모두 반영)');
 }
+function saveFamily(id){
+  var name = fv('f_name').trim() || '가족', rel = fv('f_rel');
+  var key = rel === '본인' ? '본인' : rel === '배우자' ? '아내' : null, m = key && S.members.find(function(x){ return x.name === key; });
+  if(m){
+    var other = S.members.filter(function(x){ return x !== m; }).map(function(x){ return x.nick || x.name; });
+    if(other.indexOf(name) >= 0 || name === '공동'){ alert('다른 구성원과 같은 닉네임입니다'); return; }
+    m.nick = name;
+  }
+  upsertItem('family', id, {name:name, rel:rel, birth:fv('f_birth')});
+}
 function editFamily(id){
   var f = S.family.find(function(x){ return x.id === id; }) || {rel:'자녀'};
   openModal('<h3>'+(id?'가족 수정':'가족 추가')+'</h3>'+
-    '<label class="f">이름<input id="f_name" value="'+esc(f.name)+'"></label>'+
+    (f.rel === '본인' || f.rel === '배우자'
+      ? '<label class="f">닉네임 (화면 표시 · 설정의 가족 구성원과 같음)<input id="f_name" value="'+esc(famName(f))+'"></label>'
+      : '<label class="f">이름<input id="f_name" value="'+esc(f.name)+'"></label>')+
     '<div class="grid2"><label class="f">관계<select id="f_rel">'+REL.map(function(r){ return '<option '+(r===f.rel?'selected':'')+'>'+r+'</option>'; }).join('')+'</select></label>'+
     '<label class="f">생년월일<input id="f_birth" type="date" value="'+esc(f.birth)+'"></label></div>'+
-    '<div class="btns"><button class="btn" onclick="upsertItem(\'family\',\''+(id||'')+'\',{name:fv(\'f_name\').trim()||\'가족\',rel:fv(\'f_rel\'),birth:fv(\'f_birth\')})">저장</button><button class="btn sub" onclick="closeModal()">취소</button>'+
+    '<div class="btns"><button class="btn" onclick="saveFamily(\''+(id||'')+'\')">저장</button><button class="btn sub" onclick="closeModal()">취소</button>'+
     (id?'<span style="flex:1"></span><button class="btn bad" onclick="delItem(\'family\',\''+id+'\')">삭제</button>':'')+'</div>');
 }
 
@@ -1747,7 +1763,7 @@ function viewAlloc(){
       if(auto) h += '<div class="tiny" style="margin-top:4px">'+(k==='reserve'?'자동 = 월 생활비 6개월치. 교육비를 더하려면 [목표]에서 직접 입력':'자동 = 현금흐름의 공백기 부족분 합계')+'</div>';
     }
     var list = byOwner(S.assets).filter(function(a){ return a.bucket === k; });
-    if(list.length) h += '<div style="margin-top:10px">'+list.map(function(a){ return '<div class="row" onclick="editAsset(\''+a.id+'\')"><div class="m"><div class="t">'+esc(a.name)+(a.owner?'<span class="tag">'+esc(a.owner)+'</span>':'')+'</div></div><div class="v">'+fm(num(a.value))+'</div></div>'; }).join('')+'</div>';
+    if(list.length) h += '<div style="margin-top:10px">'+list.map(function(a){ return '<div class="row" onclick="editAsset(\''+a.id+'\')"><div class="m"><div class="t">'+esc(a.name)+(a.owner?'<span class="tag">'+esc(nm(a.owner))+'</span>':'')+'</div></div><div class="v">'+fm(num(a.value))+'</div></div>'; }).join('')+'</div>';
     if(planned[k].length) h += planned[k].map(function(l){ return '<div class="row" onclick="editLump(\''+l.id+'\')"><div class="m"><div class="t">'+esc(l.name)+'<span class="tag">예정 '+ymDot(l.month)+'</span></div></div><div class="v pos">+'+fm(num(l.amount))+'</div></div>'; }).join('');
     h += '</div>';
   });
