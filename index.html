@@ -62,6 +62,8 @@ nav button.on{color:var(--accent);font-weight:700}
 .row .v{font-family:var(--mono);text-align:right;white-space:nowrap}
 .grp{font-size:var(--f-sm);color:var(--t2);margin:14px 2px 2px;display:flex;justify-content:space-between}
 .grp:first-child{margin-top:0}
+.grp.big{font-size:19px;font-weight:700;color:var(--t1);margin:20px 2px 4px;padding-bottom:6px;border-bottom:1px solid var(--bd)}
+.grp.big:first-of-type{margin-top:4px}
 .btn{background:var(--accent);color:#fff;border:0;border-radius:10px;padding:10px 14px;font-weight:700;cursor:pointer;font-size:var(--f-sm)}
 .btn.sub{background:var(--s3);color:var(--t1)}
 .btn.bad{background:var(--bad)}
@@ -610,7 +612,7 @@ function viewAssets(){
   Object.keys(CATS).forEach(function(c){
     var list = byOwner(S.assets).filter(function(a){ return a.cat === c; });
     if(!list.length) return;
-    h += '<div class="grp"><span>'+CATS[c]+'</span><span class="num">'+fm(t.byCat[c])+'</span></div>';
+    h += '<div class="grp big"><span>'+CATS[c]+'</span><span class="num">'+fm(t.byCat[c])+'</span></div>';
     list.forEach(function(a){
       h += '<div class="row" onclick="editAsset(\''+a.id+'\')"><div class="m"><div class="t">'+esc(a.name)+
         (a.owner ? '<span class="tag">'+esc(nm(a.owner))+'</span>' : '')+(a.bucket ? '<span class="tag">'+BUCKETS[a.bucket].slice(0,1)+'</span>' : '')+(isRbAsset(a.id) ? '<span class="tag">리밸런서</span>' : '')+'</div>'+
