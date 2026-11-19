@@ -868,7 +868,7 @@ function editLump(id){
     '<div id="repBox" style="display:'+(x.repeat?'block':'none')+'"><label class="f">반복 끝 (비우면 계속)<input id="f_until" type="month" value="'+esc(x.until)+'"></label>'+
     '<div class="tiny" style="margin:-4px 0 10px">은퇴 전 저축액에 이미 들어간 수당(명절휴가비 등)은 넣지 마세요. 두 번 계산됩니다.</div></div>'+
     (x.done ? '<label class="chk"><input type="checkbox" id="f_done" checked> 완료 ('+esc(x.doneNote||'')+') — 끄면 다시 예정으로</label>' : '')+
-    '<label class="f">들어갈 목적별 예산 (배분 탭 예정액에 반영)<select id="f_bucket">'+bucketOptions(x.bucket || '', true)+'</select></label>'+
+    '<label class="f">들어갈 목적별 예산 (예산 탭 예정액에 반영)<select id="f_bucket">'+bucketOptions(x.bucket || '', true)+'</select></label>'+
     '<label class="f">메모<input id="f_note" value="'+esc(x.note)+'"></label>'+
     '<div class="btns"><button class="btn" onclick="upsertItem(\'lumps\',\''+(id||'')+'\',{name:fv(\'f_name\').trim()||\'목돈\',amount:num(fv(\'f_amount\')),month:fv(\'f_month\'),repeat:document.getElementById(\'f_repeat\').checked,until:fv(\'f_until\'),bucket:fv(\'f_bucket\'),done:!!(document.getElementById(\'f_done\')||{}).checked,note:fv(\'f_note\').trim()})">저장</button><button class="btn sub" onclick="closeModal()">취소</button>'+
     (id?'<span style="flex:1"></span><button class="btn bad" onclick="delItem(\'lumps\',\''+id+'\')">삭제</button>':'')+'</div>');
