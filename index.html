@@ -884,7 +884,8 @@ function openSettings(){
   var dark = document.documentElement.dataset.theme !== 'light';
   openModal('<h3>설정</h3>'+
     '<div class="card"><h2>클라우드 동기화</h2>'+
-    (u ? '<div class="muted">'+esc(u.email)+' 로 로그인됨 · 가계 장부를 함께 씁니다</div><div class="btns"><button class="btn sub" onclick="cloudPull(true)">지금 동기화</button><button class="btn sub" onclick="signOut()">로그아웃</button></div>'
+    (u ? '<div class="muted"><b>'+esc(whoName(u.email))+'</b>('+esc(u.email)+')으로 로그인됨 · 가계 장부를 함께 씁니다</div>'+
+      (META.by ? '<div class="tiny" style="margin-top:4px">마지막 수정: '+esc(whoName(META.by))+(META.at ? ' · '+new Date(META.at).toLocaleString('ko-KR',{month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit',hour12:false}) : '')+'</div>' : '')+'<div class="btns"><button class="btn sub" onclick="cloudPull(true)">지금 동기화</button><button class="btn sub" onclick="signOut()">로그아웃</button></div>'
        : (!sb ? '<div class="muted">동기화 모듈을 불러오지 못했습니다 (오프라인?)</div>' :
          '<div class="muted">이메일로 받은 6자리 코드로 로그인합니다. 리밸런서와 같은 계정입니다.</div>'+
          (_otpEmail ? '<label class="f">'+esc(_otpEmail)+' 로 보낸 코드<input id="f_code" inputmode="numeric" maxlength="6" autocomplete="one-time-code"></label><div class="btns"><button class="btn" onclick="verifyCode()">확인</button><button class="btn sub" onclick="_otpEmail=\'\';openSettings()">다시 입력</button></div>'
@@ -900,7 +901,17 @@ function openSettings(){
     '<div class="btns"><button class="btn sub" onclick="closeModal()">닫기</button></div>');
 }
 function saveMembers(){
-  S.members = S.members.map(function(m,i){ return {name:fv('m_n'+i).trim()||m.name, email:fv('m_e'+i).trim().toLowerCase()}; });
+  var next = S.members.map(function(m,i){ return {name:fv('m_n'+i).trim()||m.name, email:fv('m_e'+i).trim().toLowerCase()}; });
+  var names = next.map(function(m){ return m.name; });
+  if(names.some(function(n,i){ return names.indexOf(n) !== i; }) || names.indexOf('공동') >= 0){ alert('구성원 이름이 겹치거나 \'공동\'입니다'); return; }
+  // 이름이 바뀐 사람: 급여 장부·명의(자산·부채·소득·지출·목돈 등)도 새 이름으로 옮김
+  S.members.forEach(function(m, i){
+    var a = m.name, b = next[i].name; if(a === b) return;
+    Object.keys(S.salary || {}).forEach(function(y){ var Y = S.salary[y]; if(Y && Y[a] && !Y[b]){ Y[b] = Y[a]; delete Y[a]; } });
+    Object.keys(S).forEach(function(k){ if(Array.isArray(S[k])) S[k].forEach(function(x){ if(x && x.owner === a) x.owner = b; }); });
+    if(OWNER === a){ OWNER = b; localStorage.setItem('cf_owner', b); }
+  });
+  S.members = next;
   closeModal(); commit(); toast('구성원을 저장했습니다');
 }
 function setTheme(t){ document.documentElement.dataset.theme = t; localStorage.setItem('cf_theme', t);
@@ -961,11 +972,19 @@ var HOME_URL = 'https://rcntiger.github.io/cashflow/';
 var sb = window.supabase ? window.supabase.createClient(SB_URL, SB_KEY) : null;
 var _user = null, _otpEmail = '', _pushTimer = null, _busy = false;
 
+// 로그인 이메일 → 가족 구성원 이름 (없으면 @ 앞부분)
+function whoName(email){
+  if(!email) return '';
+  if(/^auto/.test(email)) return '자동 갱신';
+  var e = String(email).toLowerCase(), m = S.members.find(function(x){ return x.email && x.email.toLowerCase() === e; });
+  return m ? m.name : e.split('@')[0];
+}
 function setCloud(st, msg){
   var el = document.getElementById('cloud');
   var map = {off:['','로컬 저장'], saving:['var(--accent)','동기화 중…'], saved:['var(--good)','☁ 동기화됨'], error:['var(--bad)','☁ 오류']};
   var m = map[st] || map.off;
-  el.style.color = m[0]; el.textContent = m[1]; el.title = msg || '';
+  var txt = m[1]; if(st === 'saved' && _user) txt = '☁ ' + whoName(_user.email) + ' · 동기화됨';
+  el.style.color = m[0]; el.textContent = txt; el.title = msg || (_user ? _user.email : '');
   if(st === 'error' && msg) console.warn('[cloud]', msg);
 }
 async function sendCode(){
@@ -1001,7 +1020,7 @@ async function cloudPush(){
     var now = new Date().toISOString();
     var r = await sb.from('cashflow_data').upsert({household:'home', data:S, updated_at:now, updated_by:_user.email}).select('updated_at').single();
     if(r.error) throw r.error;
-    META.base = (r.data && r.data.updated_at) || now; META.dirty = false; saveMeta();   // 서버가 돌려준 시각을 기억
+    META.base = (r.data && r.data.updated_at) || now; META.dirty = false; META.by = _user.email; META.at = META.base; saveMeta();   // 서버가 돌려준 시각을 기억
     setCloud('saved');
   }catch(e){
     setCloud('error', /relation|does not exist|schema cache/i.test(e.message) ? 'cashflow 테이블이 없습니다 — supabase/cashflow.sql 을 먼저 실행하세요' : e.message);
@@ -1011,10 +1030,10 @@ async function cloudPush(){
 async function resolveConflict(){
   var r = await sb.from('cashflow_data').select('data,updated_at,updated_by').eq('household','home').maybeSingle();
   if(r.error || !r.data) return;
-  var who = r.data.updated_by || '다른 기기';
-  if(_user && who.toLowerCase() === _user.email.toLowerCase()) who = '이 계정의 다른 기기';
-  if(/^auto/.test(who)) who = '자동 갱신(매월 1일)';
-  if(confirm(who + ' 가 서버 장부를 먼저 바꿨습니다.\n\n확인: 서버 장부로 바꾸기 (이 기기의 최근 수정은 버림)\n취소: 이 기기 장부로 서버를 덮어쓰기')){
+  var by = r.data.updated_by || '', who = by ? whoName(by) : '다른 기기';
+  if(_user && by.toLowerCase() === _user.email.toLowerCase()) who = whoName(by) + '(이 계정의 다른 기기)';
+  if(/^auto/.test(by)) who = '자동 갱신(매월 1일)';
+  if(confirm(who + '이(가) 다른 기기에서 서버 장부를 먼저 바꿨습니다.\n\n확인: 서버 장부로 바꾸기 (이 기기의 최근 수정은 버림)\n취소: 이 기기 장부로 서버를 덮어쓰기')){
     applyServer(r.data);
   } else {
     META.base = r.data.updated_at; saveMeta(); cloudPush();
@@ -1023,7 +1042,7 @@ async function resolveConflict(){
 function applyServer(row){
   S = normalize(row.data || {});
   localStorage.setItem(LS_DATA, JSON.stringify(S));
-  META.base = row.updated_at; META.dirty = false; saveMeta();
+  META.base = row.updated_at; META.dirty = false; META.by = row.updated_by || ''; META.at = row.updated_at; saveMeta();
   render(); setCloud('saved');
 }
 async function cloudPull(manual){
@@ -1037,6 +1056,7 @@ async function cloudPull(manual){
     if(!r.data){                               // 서버가 비어 있음 → 이 기기 장부로 시작
       if(S.assets.length || S.incomes.length) await cloudPush(); else setCloud('saved');
     } else if(sameTime(r.data.updated_at, META.base)){ // 서버 변화 없음
+      META.by = r.data.updated_by || META.by; META.at = r.data.updated_at; saveMeta();
       if(META.dirty) await cloudPush(); else { setCloud('saved'); render(); }
     } else if(META.dirty && (S.assets.length || S.incomes.length)){
       await resolveConflict();
