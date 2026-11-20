@@ -376,7 +376,7 @@ function spendAt(i){
 }
 // 고정지출 합계 (저축 분류 제외)
 var EXP_COLOR = {living:'var(--c0)', allowance:'var(--c2)', family:'var(--c1)', insurance:'var(--c3)', edu:'var(--c4)', house:'var(--c5)', tax:'var(--t2)', etc:'var(--t3, var(--t2))'};
-var EXP_CATS = {living:'생활비', insurance:'보험', edu:'학원·교육', house:'관리비·통신', tax:'세금', allowance:'용돈·식대', family:'양가 지원', saving:'저축 (지출 아님)', etc:'기타'};
+var EXP_CATS = {living:'생활비', insurance:'보험료', edu:'교육비', house:'관리비·통신', tax:'세금', allowance:'용돈·식대', family:'양가 지원', saving:'저축 (지출 아님)', etc:'기타'};
 function expEnd(x){ var l = linkEnd(x); return l != null ? l : ymIdx(x.end); }
 function expActive(x, i){ var s = ymIdx(x.start), e = expEnd(x); return (s == null || s <= i) && (e == null || i <= e); }
 function expenseAt(i){ return sum(S.expenses.filter(function(x){ return x.cat !== 'saving' && expActive(x, i); }), function(x){ return num(x.monthly); }); }
