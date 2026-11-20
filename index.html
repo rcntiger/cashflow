@@ -657,11 +657,11 @@ function viewFlow(){
   var per = incomePeriods();
   // 모바일에서 줄바꿈되지 않게: 기간은 '26.11~32.12, 금액은 만원 단위 숫자만
   var yy = function(i){ var s = idxYm(i); return s.slice(2,4)+'.'+s.slice(5); };
-  var nm = function(v){ return HIDE ? '••••' : Math.round(v).toLocaleString('ko-KR'); };
+  var nmv = function(v){ return HIDE ? '••••' : Math.round(v).toLocaleString('ko-KR'); };
   h += '<div class="card R"><h2>기간별 월 소득<span class="sp"></span><span class="tiny">단위 만원</span></h2><table><tr><th>기간</th><th>소득</th><th>생활비</th><th>차이</th></tr>';
   per.forEach(function(p){
     var after = p.s != null, gap = after ? p.v - p.s : 0;
-    h += '<tr'+(p.pre?' style="color:var(--t2)"':'')+'><td>'+yy(p.from)+'~'+(p.to >= num(S.sim.endYear)*12+11 ? '' : yy(p.to))+(p.pre?'*':'')+'</td><td>'+nm(p.v)+'</td><td>'+(after ? nm(p.s) : '–')+'</td><td class="'+(after ? (gap<0?'neg':'pos') : '')+'">'+(after ? (gap>=0?'+':'')+nm(gap) : '–')+'</td></tr>';
+    h += '<tr'+(p.pre?' style="color:var(--t2)"':'')+'><td>'+yy(p.from)+'~'+(p.to >= num(S.sim.endYear)*12+11 ? '' : yy(p.to))+(p.pre?'*':'')+'</td><td>'+nmv(p.v)+'</td><td>'+(after ? nmv(p.s) : '–')+'</td><td class="'+(after ? (gap<0?'neg':'pos') : '')+'">'+(after ? (gap>=0?'+':'')+nmv(gap) : '–')+'</td></tr>';
   });
   h += '</table><div class="tiny" style="margin-top:6px">* 생활비 시작('+ymDot(S.sim.lifeStart)+') 전 생활비는 월 고정지출 합계(참고용)입니다. 시뮬레이션은 이 기간에 \'그 전 월 저축액\'을 씁니다. 생활비에는 대출 이자·상환액이 포함됩니다'+(S.sim.spendMode==='expenses'?' · 수입지출 탭의 고정지출 목록 기준':'')+'</div></div>';
   h += viewFamily();
