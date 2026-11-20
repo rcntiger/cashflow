@@ -683,7 +683,7 @@ function periodCard(){
 }
 function incomeCard(){
   var h = '';
-  h += '<div class="card R"><h2>월 소득 항목</h2>';
+  h += '<div class="card R"><h2>시기별 월 소득</h2>';
   if(!S.incomes.length) h += '<div class="empty">연금·급여·월세처럼 매달 들어오는 돈</div>';
   // 명의별로 나누고, 칸 안에서는 시작 순서 · 사이가 비면 '공백' 줄
   var owners = S.members.map(function(m){ return m.name; }).concat(['공동']);
