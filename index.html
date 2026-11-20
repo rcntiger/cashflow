@@ -298,10 +298,10 @@ function totals(all){
 }
 // 급여 항목: 수입지출 탭 급여 장부와 연동 (그달 실제 입력값 → 없으면 가장 최근 연도 월 환산)
 function isSalary(x){ return x.kind === 'salary'; }
-function ledgerMonthly(who, i){
+function ledgerMonthly(who, i, avgOnly){   // avgOnly: 그달 실수령 대신 월 환산(기간 대표값)
   var y = Math.floor(i/12), m = i%12, P = (S.salary[y] || {})[who];
   var pay = P && P.months ? Math.floor(num(P.months[m]) + 1e-9) : 0;
-  if(pay > 0) return {v: pay + sum(allExtras(y, P).filter(function(e){ return num(e.month) === m+1; }), function(e){ return Math.floor(num(e.amount) + 1e-9); }), src:'actual'};
+  if(pay > 0 && !avgOnly) return {v: pay + sum(allExtras(y, P).filter(function(e){ return num(e.month) === m+1; }), function(e){ return Math.floor(num(e.amount) + 1e-9); }), src:'actual'};
   // 월급은 실수령을 입력한 가장 최근 연도의 월 평균, 수당은 그해 기록(본봉 자동 포함)이 있으면 그해 것, 없으면 같은 연도 것
   var hasMonths = function(k){ var s = salStat(k, who); return s && s.n > 0; };
   var all = Object.keys(S.salary).map(Number);
@@ -317,8 +317,8 @@ function ledgerMonthly(who, i){
   }
   return null;
 }
-function incomeItemAt(x, i){
-  if(isSalary(x)){ var l = ledgerMonthly(x.owner, i); if(l) return l.v; }
+function incomeItemAt(x, i, avgOnly){
+  if(isSalary(x)){ var l = ledgerMonthly(x.owner, i, avgOnly); if(l) return l.v; }
   return num(x.monthly);
 }
 // 급여 항목에 끝 월이 없으면 가족 정보의 퇴직 월(없으면 정년)까지로 봄
@@ -327,11 +327,11 @@ function incEnd(x){
   var f = S.family.find(function(m){ return (m.rel === '본인' || m.rel === '배우자') && memberOf(m) === x.owner && m.birth; });
   return f ? retireIdx(f) : null;
 }
-function incomeAt(i){
+function incomeAt(i, avgOnly){
   return sum(S.incomes.filter(function(x){
     var s = ymIdx(x.start), e = incEnd(x);
     return (s == null || s <= i) && (e == null || i <= e);
-  }), function(x){ return incomeItemAt(x, i); });
+  }), function(x){ return incomeItemAt(x, i, avgOnly); });
 }
 function lumpAt(i){
   return sum(S.lumps.filter(function(x){ return lumpHits(x, i); }), function(x){ return num(x.amount); });
@@ -395,7 +395,7 @@ function sortedPhases(){ return (S.sim.phases || []).slice().sort(function(a,b){
 function incomePeriods(){
   var start = nowIdx(), end = num(S.sim.endYear)*12 + 11, out = [], cur = null;
   for(var i = start; i <= end; i++){
-    var v = incomeAt(i), s = spendAt(i), pre = false;
+    var v = incomeAt(i, true), s = spendAt(i), pre = false;   // 기간 표는 월 환산 기준
     // 은퇴 전(생활비 시작 전)에는 표에 참고용으로 고정지출 합계를 보여 줌 (시뮬레이션 계산에는 쓰지 않음)
     if(s == null && S.expenses.length){ s = Math.round(expenseAt(i) + debtCostAt(i)); pre = true; }
     if(cur && cur.v === v && cur.s === s && cur.pre === pre){ cur.to = i; }
@@ -700,7 +700,7 @@ function incomeCard(){
       if(prevEnd != null && si != null && si > prevEnd + 1)
         h += '<div class="row gaprow"><div class="m"><div class="t wrn">공백</div><div class="tiny">'+ymDot(idxYm(prevEnd+1))+' ~ '+ymDot(idxYm(si-1))+' · '+Math.round((si-prevEnd-1)/12*10)/10+'년</div></div><div class="v wrn">0</div></div>';
       if(ei == null) prevEnd = Infinity; else if(prevEnd == null || ei > prevEnd) prevEnd = ei;
-      var cur = incomeItemAt(x, Math.max(nowIdx(), si || 0));
+      var cur = incomeItemAt(x, Math.max(nowIdx(), si || 0), true);   // 기간 대표값: 월 환산
       h += '<div class="row" onclick="editIncome(\''+x.id+'\')"><div class="m"><div class="t">'+esc(x.name)+(isSalary(x)?'<span class="tag">급여 장부</span>':'')+'</div><div class="tiny">'+(x.start?ymDot(x.start):'지금')+' ~ '+(ei!=null?ymDot(idxYm(ei))+(!x.end?' (퇴직 월)':''):'계속')+'</div></div><div class="v">월 '+fm(cur)+'</div></div>';
     });
     h += '</div>';
