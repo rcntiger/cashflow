@@ -750,10 +750,10 @@ function viewSim(){
   var pts = r.years.map(function(y){ return {x:String(y.y).slice(2), y:y.bal}; });
   var marks = [{x:String(Math.floor((ymIdx(s.lifeStart)||nowIdx())/12)).slice(2), t:'생활비 시작', c:'var(--warn)'}];
   var h = '<div class="simL"><div class="card"><h2>가정</h2><div class="grid2">'+
-    simField('③ 장기투자 수익률 (%/년)', 'rate', 'number', '0.5')+
+    simField('③ 장기 수익률 (%/년)', 'rate', 'number', '0.5')+
     simField('① 생활 예비 수익률', 'rateR', 'number', '0.5')+
     simField('② 공백 대비 수익률', 'rateG', 'number', '0.5')+
-    simField('급여 실질 상승률 (%/년)', 'salGrow', 'number', '0.1')+
+    simField('급여 상승률 (%/년)', 'salGrow', 'number', '0.1')+
     simField('생활비 시작 (년-월)', 'lifeStart', 'month')+
     simField('그 전 월 저축액 (만원)', 'saveBefore', 'number', '10')+
     simField('기본 월 생활비 (만원)', 'spend', 'number', '10')+
