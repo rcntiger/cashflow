@@ -1608,6 +1608,15 @@ function timelineMarks(){
   var now = nowIdx(), out = [];
   S.lumps.forEach(function(l){ var i = ymIdx(l.month); if(!l.repeat && !l.done && i != null && i >= now) out.push({i:i, t:l.name, amt:num(l.amount), on:'editLump(\''+l.id+'\')'}); });
   S.family.forEach(function(f){ if(f.rel === '자녀' && f.birth){ var p = f.birth.split('-').map(Number), i = (p[0]+19)*12 + p[1] - 1; if(i >= now) out.push({i:i, t:f.name+' 성년 (만 19세)', on:'tlChild(\''+f.id+'\')'}); } });
+  // 자녀 학업·군 일정 (막대와 같은 계산, 누르면 학업·군 일정 창)
+  S.family.forEach(function(f){
+    if(f.rel !== '자녀' || !f.birth) return;
+    var c = childPlan(f); if(!c) return;
+    var on = 'tlChild(\''+f.id+'\')', nm0 = famName(f);
+    var ev = [[c.mid, '중학교 입학'], [c.high, '고등학교 입학'], [c.uni, '대학 입학'], [c.grad, '대학 졸업']];
+    if(c.army) ev.push([c.army.from, '입대'], [c.army.to + 1, '전역']);
+    ev.forEach(function(e){ if(e[0] != null && e[0] >= now) out.push({i:e[0], t:nm0+' '+e[1], on:on}); });
+  });
   return out.sort(function(a,b){ return a.i - b.i; });
 }
 function viewTimeline(){
