@@ -1332,7 +1332,7 @@ function viewMoney(){
     '<div class="kv" style="margin-top:8px"><div class="k">월 저축 여력 (이번 달)</div><div class="v '+(cap<0?'neg':'pos')+'">'+fm(cap)+'</div></div></div>';
   h += '<div class="chips">'+[['in','수입'],['out','지출'],['flow','흐름']].map(function(c){ return '<button class="chip '+(MSUB===c[0]?'on':'')+'" onclick="setMsub(\''+c[0]+'\')">'+c[1]+'</button>'; }).join('')+'</div>';
   if(MSUB === 'out') h += viewExpenses() + lumpCard();
-  else if(MSUB === 'flow') h += periodCard() + salaryPart();
+  else if(MSUB === 'flow') h += salaryPart() + periodCard();
   else h += salaryPart() + incomeCard();
   return h;
 }
