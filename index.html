@@ -185,10 +185,10 @@ var CAT_COLOR = {realestate:'var(--c2)', stock:'var(--c0)', pension:'var(--c1)',
 var FIN_CATS = ['stock','pension','mutual','cash','other'];   // 시뮬레이션에 넣는 금융자산
 var TABS = [
   {id:'dash', name:'대시보드', ic:'◎'},
+  {id:'fam', name:'가족', ic:'⌂'},
   {id:'assets', name:'자산', ic:'▤'},
   {id:'alloc', name:'예산', ic:'◫'},
-  {id:'money', name:'수입지출', ic:'₩'},
-  {id:'flow', name:'현금흐름', ic:'⇄'},
+  {id:'money', name:'자금관리', ic:'₩'},
   {id:'sim', name:'시뮬', ic:'↗'},
   {id:'todo', name:'할 일', ic:'✓'}
 ];
@@ -219,6 +219,8 @@ var S = loadLocal();
 var SNAPS = loadSnaps();           // { 'YYYY-MM': {net_worth,total_assets,total_debts,breakdown} }
 var META = loadMeta();             // { base: 서버 updated_at, dirty: bool }
 var TAB = localStorage.getItem('cf_tab') || 'dash';
+var MSUB = localStorage.getItem('cf_msub') || 'in';    // 자금관리 탭 칩: in 수입 / out 지출 / flow 흐름
+if(TAB === 'flow'){ TAB = 'money'; MSUB = 'flow'; }     // 예전 현금흐름 탭
 var HIDE = localStorage.getItem('cf_hide') === '1';     // 금액 숨김
 var OWNER = localStorage.getItem('cf_owner') || '';     // 명의 필터 ('' = 전체)
 
@@ -461,7 +463,7 @@ function render(){
     return '<button class="'+(t.id===TAB?'on':'')+'" onclick="go(\''+t.id+'\')"><span class="ic">'+t.ic+'</span>'+t.name+'</button>';
   }).join('');
   var v = document.getElementById('view');
-  v.innerHTML = '<div class="grid g-'+TAB+'">' + ({dash:viewDash, assets:viewAssets, alloc:viewAlloc, money:viewMoney, flow:viewFlow, sim:viewSim, todo:viewTodo}[TAB] || viewDash)() + '</div>';
+  v.innerHTML = '<div class="grid g-'+TAB+'">' + ({dash:viewDash, assets:viewAssets, alloc:viewAlloc, money:viewMoney, fam:viewFam, sim:viewSim, todo:viewTodo}[TAB] || viewDash)() + '</div>';
   pcLayout(v);
   var tb = TABS.find(function(t){ return t.id === TAB; }), h1 = document.querySelector('header h1');
   if(h1) h1.textContent = isPC() && tb ? tb.name : '캐시플로우';
@@ -563,6 +565,7 @@ function dueDone(id, i){
 }
 // 탭 이동을 브라우저 기록에 남겨 휴대폰 뒤로가기로 이전 탭에 돌아오게 함
 function go(t, fromPop){
+  if(t === 'flow'){ t = 'money'; MSUB = 'flow'; }
   if(!fromPop && t !== TAB) history.pushState({tab:t}, '', '#'+t);
   TAB = t; localStorage.setItem('cf_tab', t); render(); window.scrollTo(0,0);
 }
@@ -603,7 +606,7 @@ function viewDash(){
     (dc0 ? '<tr><td>대출 이자·상환</td><td class="neg">−'+fm(dc0)+'</td></tr>' : '')+
     '<tr><th style="text-align:left">남는 돈</th><th class="'+(cap0<0?'neg':'pos')+'">'+fm(cap0)+'</th></tr></table>'+
     '<div class="btns"><button class="btn sub sm" onclick="go(\'money\')">수입지출 보기</button></div></div>';
-  h += '<div class="card pc R"><h2>다가오는 목돈<span class="sp"></span><button class="btn sub sm" onclick="go(\'flow\')">전체</button></h2>'+
+  h += '<div class="card pc R"><h2>다가오는 목돈<span class="sp"></span><button class="btn sub sm" onclick="goMoney(\'out\')">전체</button></h2>'+
     (up.length ? up.map(function(o){ var a = num(o.l.amount); return '<div class="row" onclick="editLump(\''+o.l.id+'\')"><div class="m"><div class="t">'+esc(o.l.name)+'</div><div class="tiny">'+ymDot(idxYm(o.i))+'</div></div><div class="v '+(a<0?'neg':'pos')+'">'+(a>=0?'+':'')+fm(a)+'</div></div>'; }).join('') : '<div class="empty">예정된 목돈이 없습니다</div>')+'</div>';
   h += '<div class="card R"><h2>순자산 추이<span class="sp"></span><button class="btn sm '+(saved?'sub':'')+'" onclick="saveSnapshot()">'+(saved?'이번 달 다시 기록':'이번 달 기록')+'</button></h2>'+
     lineChart(pts, {zero:false, empty:'매달 한 번 [이번 달 기록]을 누르면 추이가 쌓입니다'})+
@@ -661,12 +664,8 @@ function viewAssets(){
   return h;
 }
 
-function viewFlow(){
-  var cur = nowIdx(), y0 = Math.floor(cur/12), y1 = num(S.sim.endYear), life = ymIdx(S.sim.lifeStart);
-  var per0 = incomePeriods(), gaps = per0.filter(function(p){ return p.s != null; }).map(function(p){ return p.v - p.s; });
-  var worst = gaps.length ? Math.min.apply(null, gaps) : 0;
-  var h = kpis([['지금 월 소득', fm(incomeAt(cur))], ['은퇴 후 월 소득', life != null ? fm(incomeAt(life)) : '–', '', life != null ? ymDot(S.sim.lifeStart)+'부터' : ''], ['은퇴 후 월 생활비', life != null && spendAt(life) != null ? fm(spendAt(life)) : '–'], ['가장 모자란 구간', worst < 0 ? fm(worst) : '없음', worst < 0 ? 'neg' : 'pos', '월 기준']]);
-  h += viewTimeline();
+function periodCard(){
+  var h = '';
   var per = incomePeriods();
   // 모바일에서 줄바꿈되지 않게: 기간은 '26.11~32.12, 금액은 만원 단위 숫자만
   var yy = function(i){ var s = idxYm(i); return s.slice(2,4)+'.'+s.slice(5); };
@@ -677,7 +676,10 @@ function viewFlow(){
     h += '<tr'+(p.pre?' style="color:var(--t2)"':'')+'><td>'+yy(p.from)+'~'+(p.to >= num(S.sim.endYear)*12+11 ? '' : yy(p.to))+(p.pre?'*':'')+'</td><td>'+nmv(p.v)+'</td><td>'+(after ? nmv(p.s) : '–')+'</td><td class="'+(after ? (gap<0?'neg':'pos') : '')+'">'+(after ? (gap>=0?'+':'')+nmv(gap) : '–')+'</td></tr>';
   });
   h += '</table><div class="tiny" style="margin-top:6px">* 생활비 시작('+ymDot(S.sim.lifeStart)+') 전 생활비는 월 고정지출 합계(참고용)입니다. 시뮬레이션은 이 기간에 \'그 전 월 저축액\'을 씁니다. 생활비에는 대출 이자·상환액이 포함됩니다'+(S.sim.spendMode==='expenses'?' · 수입지출 탭의 고정지출 목록 기준':'')+'</div></div>';
-  h += viewFamily();
+  return h;
+}
+function incomeCard(){
+  var h = '';
   h += '<div class="card R"><h2>월 소득 항목</h2>';
   if(!S.incomes.length) h += '<div class="empty">연금·급여·월세처럼 매달 들어오는 돈</div>';
   // 명의별로 나누고, 칸 안에서는 시작 순서 · 사이가 비면 '공백' 줄
@@ -700,7 +702,12 @@ function viewFlow(){
     });
     h += '</div>';
   });
-  h += '</div><div class="card"><h2>목돈 일정<span class="sp"></span><button class="btn sm" onclick="editLump()">+ 추가</button></h2>';
+  h += '</div>';
+  return h;
+}
+function lumpCard(){
+  var h = '';
+  h += '<div class="card"><h2>목돈 일정<span class="sp"></span><button class="btn sm" onclick="editLump()">+ 추가</button></h2>';
   if(!S.lumps.length) h += '<div class="empty">퇴직수당·적금 만기·교육비 같은 일회성 입출금</div>';
   S.lumps.slice().sort(function(a,b){ return (a.month||'').localeCompare(b.month||''); }).forEach(function(x){
     var a = num(x.amount);
@@ -1274,7 +1281,7 @@ function salStat(y, who){
   return {n:ms.length, avg:avg, regular:sum(ms), extras:ex, annual:avg*12 + ex, monthly:avg + ex/12};
 }
 function salYears(){ var ys = Object.keys(S.salary).map(Number).filter(function(y){ return S.members.some(function(m){ return salStat(y, m.name); }); }); return ys.sort(); }
-function viewMoney(){
+function salaryPart(){
   var y = SAL_YEAR, years = salYears(), now = nowIdx(), cy = new Date().getFullYear();
   // 연도 버튼: 선택 연도 앞뒤 1년씩 + ◀ ▶ 로 이동 (기록 있는 해는 점 표시)
   var chips = [];
@@ -1299,8 +1306,8 @@ function viewMoney(){
   var exp = expenseAt(now), saving = sum(S.expenses.filter(function(x){ return x.cat === 'saving' && expActive(x, now); }), function(x){ return num(x.monthly); });
   var dc = debtCostAt(now);
   var inM = hh/12 + other, cap = inM - exp - dc;
-  h = h.replace('<div class="pair">', kpis(mm.concat([['월 고정지출', fm(exp), 'neg'], ['월 저축 여력', fm(cap), cap<0?'neg':'pos']])) + '<div class="pair">');
-  h += '<div class="card R"><h2>저축 여력 ('+y+'년 급여 기준)</h2><table>'+
+  if(MSUB !== 'flow') return h;
+  h = '<div class="card R"><h2>저축 여력 ('+y+'년 급여 기준)</h2><table>'+
     '<tr><td>급여 (부부 합산)</td><td>'+fm(hh/12)+'</td></tr>'+
     '<tr><td>그 밖의 소득 (월세 등)</td><td>'+fm(other)+'</td></tr>'+
     '<tr><td>월 고정지출</td><td class="neg">−'+fm(exp)+'</td></tr>'+
@@ -1308,10 +1315,26 @@ function viewMoney(){
     '<tr><td>월 저축 여력</td><td class="'+(cap<0?'neg':'pos')+'">'+fm(cap)+'</td></tr></table>'+
     '<div class="btns"><button class="btn sm" onclick="applySaving('+Math.round(cap)+')">시뮬레이션 \'그 전 월 저축액\'에 반영</button>'+(S.members.some(function(m){ return !S.incomes.some(function(x){ return isSalary(x) && x.owner === m.name; }); }) ? '<button class="btn sub sm" onclick="applySalaryIncome('+y+')">현금흐름에 급여 항목 연결</button>' : '')+'</div>'+
     '<div class="tiny" style="margin-top:6px">지금 시뮬레이션 값: 월 '+fm(num(S.sim.saveBefore))+'</div></div>';
-  // 고정지출
-  h += viewExpenses();
   return h;
 }
+// 자금관리 탭: 맨 위 이번 달 숫자 + 칩(수입·지출·흐름)
+function setMsub(s){ MSUB = s; localStorage.setItem('cf_msub', s); render(); window.scrollTo(0,0); }
+function goMoney(s){ MSUB = s; localStorage.setItem('cf_msub', s); go('money'); }
+function viewMoney(){
+  var now = nowIdx(), mi = monthIncome(now), exp = expenseAt(now), dc = debtCostAt(now), cap = mi.v - exp - dc;
+  var h = kpis([['가계 월 소득', fm(mi.v), '', mi.src], ['월 고정지출', fm(exp), 'neg', dc ? '대출 이자·상환 '+fm(dc)+' 별도' : ''], ['월 저축 여력', fm(cap), cap<0?'neg':'pos', '이번 달 기준']]);
+  h += '<div class="card mob"><div class="grid2">'+
+    '<div class="kv"><div class="k">가계 월 소득</div><div class="v">'+fm(mi.v)+'</div><div class="tiny">'+mi.src+'</div></div>'+
+    '<div class="kv"><div class="k">월 고정지출</div><div class="v neg">'+fm(exp)+'</div>'+(dc?'<div class="tiny">대출 '+fm(dc)+' 별도</div>':'')+'</div></div>'+
+    '<div class="kv" style="margin-top:8px"><div class="k">월 저축 여력 (이번 달)</div><div class="v '+(cap<0?'neg':'pos')+'">'+fm(cap)+'</div></div></div>';
+  h += '<div class="chips">'+[['in','수입'],['out','지출'],['flow','흐름']].map(function(c){ return '<button class="chip '+(MSUB===c[0]?'on':'')+'" onclick="setMsub(\''+c[0]+'\')">'+c[1]+'</button>'; }).join('')+'</div>';
+  if(MSUB === 'out') h += viewExpenses() + lumpCard();
+  else if(MSUB === 'flow') h += periodCard() + salaryPart();
+  else h += salaryPart() + incomeCard();
+  return h;
+}
+// 가족 탭: 생애 타임라인 + 가족 나이
+function viewFam(){ return viewTimeline() + viewFamily(); }
 function expActiveInc(x, i){ var s = ymIdx(x.start), e = incEnd(x); return (s == null || s <= i) && (e == null || i <= e); }
 function setSal(y, who, i, v){ var P = salOf(y, who); P.months[i] = String(v).trim() === '' ? null : manFloor(v); commit(); }
 // 본봉 입력 칸: 승급 전·후 본봉, 승급 월, 연가보상 일수 (+ 명절·연가 지급 월)
@@ -1553,7 +1576,7 @@ function timelineMarks(){
 }
 function viewTimeline(){
   if(!S.family.some(function(f){ return f.birth && (f.rel === '본인' || f.rel === '배우자' || f.rel === '자녀'); }))
-    return '<div class="card"><h2>생애 타임라인</h2><div class="empty">아래 \'가족 나이\'에 본인·배우자·자녀 생일을 넣으면 재직·연금·학업·군 복무가 연도 축에 그려집니다</div></div>';
+    return '<div class="card"><h2>생애 타임라인</h2><div class="empty">\'가족 나이\'에 본인·배우자·자녀 생일을 넣으면 재직·연금·학업·군 복무가 연도 축에 그려집니다</div></div>';
   var lanes = timelineLanes(), marks = timelineMarks();
   var y0 = new Date().getFullYear(), y1 = y0 + 22, A = y0*12, B = (y1+1)*12;
   var vw = (document.getElementById('view') || {}).clientWidth || 380;
