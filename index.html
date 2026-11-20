@@ -488,7 +488,7 @@ function toggleHide(){ HIDE = !HIDE; localStorage.setItem('cf_hide', HIDE ? '1' 
 function monthIncome(i){
   var srcs = {};
   S.incomes.forEach(function(x){ if(isSalary(x) && expActiveInc(x, i)){ var l = ledgerMonthly(x.owner, i); srcs[l ? l.src : 'item'] = 1; } });
-  var src = srcs.actual ? '급여 장부 (이번 달 입력)' : srcs.avg ? '부부 월 급여 합산' : '소득 항목 기준';
+  var src = srcs.actual ? '수입지출 반영' : srcs.avg ? '부부 월 급여 합산' : '소득 항목 기준';
   return {v: incomeAt(i), src: src};
 }
 // 순자산 카드: 자산군별 금액을 그 색 글자로 (도표 없이)
