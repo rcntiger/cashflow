@@ -1288,7 +1288,7 @@ function viewMoney(){
   var inM = hh/12 + other, cap = inM - exp - dc;
   h = h.replace('<div class="pair">', kpis(mm.concat([['월 고정지출', fm(exp), 'neg'], ['월 저축 여력', fm(cap), cap<0?'neg':'pos']])) + '<div class="pair">');
   h += '<div class="card R"><h2>저축 여력 ('+y+'년 급여 기준)</h2><table>'+
-    '<tr><td>급여 (비정기 포함, 월 환산)</td><td>'+fm(hh/12)+'</td></tr>'+
+    '<tr><td>급여 (부부 합산)</td><td>'+fm(hh/12)+'</td></tr>'+
     '<tr><td>그 밖의 소득 (월세 등)</td><td>'+fm(other)+'</td></tr>'+
     '<tr><td>월 고정지출</td><td class="neg">−'+fm(exp)+'</td></tr>'+
     (dc ? '<tr><td>대출 이자·상환</td><td class="neg">−'+fm(dc)+'</td></tr>' : '')+
