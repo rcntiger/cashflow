@@ -1703,7 +1703,6 @@ function viewFamily(){
     '<div class="tiny" style="margin:6px 0 10px">목돈·소득이 바뀌는 해만 보여 줍니다 (만 나이). 숫자를 누르면 나이를 고칠 수 있고, 이후 연도도 함께 바뀝니다. 이름을 누르면 생일·관계를 고칩니다.</div>';
   var ms = familyMilestones();
   if(ms.length) h += '<div class="grp"><span>나이에 따라 생기는 일</span></div>'+ms.slice(0, 8).map(function(m){ return '<div class="row" style="cursor:default"><div class="m"><div class="tiny num">'+ymDot(idxYm(m.i))+'</div><div>'+m.text+'</div></div></div>'; }).join('');
-  h += '<div class="btns">'+S.family.map(function(f){ return '<button class="btn sub sm" onclick="editFamily(\''+f.id+'\')">'+esc(famName(f))+' '+ageAt(f.birth, now)+'세</button>'; }).join('')+'</div>';
   return h + '</div>';
 }
 // 그해 연말 나이를 고치면 생년이 바뀌어 모든 연도 나이가 함께 바뀜 (생일 월·일은 그대로)
