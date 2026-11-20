@@ -69,6 +69,9 @@ nav button.on{color:var(--accent);font-weight:700}
 .cat-h{margin-top:0!important;align-items:center}
 h2.ttl{font-size:19px;font-weight:800;color:var(--accent);padding-left:10px;border-left:4px solid var(--accent);line-height:1.2}
 .salsum .kv .v{font-size:20px;margin-top:4px}
+.msum{text-align:center}
+.msum .kv .k{font-size:var(--f-sm)}
+.msum .kv .v{font-size:24px;font-weight:800;margin-top:4px}
 .grp.big{font-size:19px;font-weight:700;color:var(--t1);margin:20px 2px 4px;padding-bottom:6px;border-bottom:1px solid var(--bd)}
 .grp.big:first-of-type{margin-top:4px}
 .btn{background:var(--accent);color:#fff;border:0;border-radius:10px;padding:10px 14px;font-weight:700;cursor:pointer;font-size:var(--f-sm)}
@@ -1323,7 +1326,7 @@ function goMoney(s){ MSUB = s; localStorage.setItem('cf_msub', s); go('money'); 
 function viewMoney(){
   var now = nowIdx(), mi = monthIncome(now), exp = expenseAt(now), dc = debtCostAt(now), cap = mi.v - exp - dc;
   var h = kpis([['가계 월 소득', fm(mi.v), '', mi.src], ['월 고정지출', fm(exp), 'neg', dc ? '대출 이자·상환 '+fm(dc)+' 별도' : ''], ['월 저축 여력', fm(cap), cap<0?'neg':'pos', '이번 달 기준']]);
-  h += '<div class="card mob"><div class="grid2">'+
+  h += '<div class="card mob msum"><div class="grid2">'+
     '<div class="kv"><div class="k">가계 월 소득</div><div class="v">'+fm(mi.v)+'</div><div class="tiny">'+mi.src+'</div></div>'+
     '<div class="kv"><div class="k">월 고정지출</div><div class="v neg">'+fm(exp)+'</div>'+(dc?'<div class="tiny">대출 '+fm(dc)+' 별도</div>':'')+'</div></div>'+
     '<div class="kv" style="margin-top:8px"><div class="k">월 저축 여력 (이번 달)</div><div class="v '+(cap<0?'neg':'pos')+'">'+fm(cap)+'</div></div></div>';
