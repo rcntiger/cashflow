@@ -62,6 +62,11 @@ nav button.on{color:var(--accent);font-weight:700}
 .row .v{font-family:var(--mono);text-align:right;white-space:nowrap}
 .grp{font-size:var(--f-sm);color:var(--t2);margin:14px 2px 2px;display:flex;justify-content:space-between}
 .grp:first-child{margin-top:0}
+.sec-h{display:flex;align-items:center;gap:10px;margin:20px 2px 10px}
+.sec-h .ttl2{font-size:21px;font-weight:800;color:var(--accent);border-left:4px solid var(--accent);padding-left:10px;line-height:1.2}
+.sec-h .sec-sum{font-size:var(--f-md);color:var(--t2)}
+.lay .colL>.sec-h:first-child,.lay .colR>.sec-h:first-child{margin-top:0}
+.cat-h{margin-top:0!important;align-items:center}
 h2.ttl{font-size:19px;font-weight:800;color:var(--accent);padding-left:10px;border-left:4px solid var(--accent);line-height:1.2}
 .salsum .kv .v{font-size:23px;margin-top:4px}
 .grp.big{font-size:19px;font-weight:700;color:var(--t1);margin:20px 2px 4px;padding-bottom:6px;border-bottom:1px solid var(--bd)}
@@ -609,21 +614,24 @@ function viewDash(){
 function viewAssets(){
   var t = totals(), h = ownerChips();
   h += kpis(Object.keys(CATS).filter(function(c){ return t.byCat[c] > 0; }).map(function(c){ return [CATS[c], fm(t.byCat[c]), '', t.assets ? Math.round(t.byCat[c]/t.assets*100)+'%' : '']; }).concat([['부채', '−'+fm(t.debts), 'neg']]));
-  h += '<div class="card"><h2 class="ttl">자산<span class="sp"></span><button class="btn sm" onclick="editAsset()">+ 추가</button></h2>';
-  if(!byOwner(S.assets).length) h += '<div class="empty">'+(OWNER?'이 명의의 자산이 없습니다':'아직 자산이 없습니다')+'</div>';
+  // 자산: 카드 밖 큰 제목 줄 + 분류마다 카드
+  h += '<div class="sec-h"><span class="ttl2">자산</span><span class="num sec-sum">'+fm(byOwner(S.assets).reduce(function(s,a){ return s + num(a.value); }, 0))+'</span><span style="flex:1"></span><button class="btn sm" onclick="editAsset()">+ 추가</button></div>';
+  if(!byOwner(S.assets).length) h += '<div class="card"><div class="empty">'+(OWNER?'이 명의의 자산이 없습니다':'아직 자산이 없습니다')+'</div></div>';
   Object.keys(CATS).forEach(function(c){
     var list = byOwner(S.assets).filter(function(a){ return a.cat === c; });
     if(!list.length) return;
-    h += '<div class="grp big"><span>'+CATS[c]+'</span><span class="num">'+fm(t.byCat[c])+'</span></div>';
+    h += '<div class="card"><div class="grp big cat-h"><span>'+CATS[c]+'</span><span><span class="num">'+fm(t.byCat[c])+'</span><button class="btn sub sm" style="margin-left:10px" onclick="editAsset(\'\',\''+c+'\')" aria-label="'+CATS[c]+' 추가">+</button></span></div>';
     list.forEach(function(a){
       h += '<div class="row" onclick="editAsset(\''+a.id+'\')"><div class="m"><div class="t">'+esc(a.name)+
         (a.owner ? '<span class="tag">'+esc(nm(a.owner))+'</span>' : '')+(a.bucket ? '<span class="tag">'+BUCKETS[a.bucket].slice(0,1)+'</span>' : '')+(isRbAsset(a.id) ? '<span class="tag">리밸런서</span>' : '')+'</div>'+
         (a.note || a.src ? '<div class="tiny">'+esc([a.note, a.src].filter(Boolean).join(' · '))+'</div>' : '')+'</div><div class="v">'+fm(num(a.value))+(t.assets?'<span class="tiny pcI" style="display:inline-block;width:44px;text-align:right">'+Math.round(num(a.value)/t.assets*100)+'%</span>':'')+'</div></div>';
     });
+    if(c === 'stock') h += '<div class="btns"><button class="btn sub sm" onclick="syncRebalancer()">↻ 리밸런서에서 불러오기</button><button class="btn sub sm" onclick="openRbMap()">리밸런서 계좌 연결</button></div>';
+    h += '</div>';
   });
-  if(S.assets.length) h += '<div class="btns"><button class="btn sub sm" onclick="syncRebalancer()">↻ 리밸런서에서 불러오기</button><button class="btn sub sm" onclick="openRbMap()">리밸런서 계좌 연결</button></div>';
-  h += '</div>';
-  h += '<div class="card R" style="background:var(--debt-bg);border-color:var(--debt-bd)"><h2 class="ttl">부채<span class="sp"></span><button class="btn sm" onclick="editDebt()">+ 추가</button></h2>';
+  if(S.assets.length && !byOwner(S.assets).some(function(a){ return a.cat === 'stock'; })) h += '<div class="btns" style="margin:-4px 0 14px"><button class="btn sub sm" onclick="syncRebalancer()">↻ 리밸런서에서 불러오기</button><button class="btn sub sm" onclick="openRbMap()">리밸런서 계좌 연결</button></div>';
+  h += '<div class="sec-h R"><span class="ttl2">부채</span><span class="num sec-sum">'+fm(byOwner(S.debts).reduce(function(s,d){ return s + num(d.value); }, 0))+'</span><span style="flex:1"></span><button class="btn sm" onclick="editDebt()">+ 추가</button></div>';
+  h += '<div class="card R" style="background:var(--debt-bg);border-color:var(--debt-bd)">';
   if(!byOwner(S.debts).length) h += '<div class="empty">전세보증금·대출 등을 기록합니다</div>';
   byOwner(S.debts).forEach(function(d){
     var di = [];
@@ -804,8 +812,8 @@ function ownerOptions(sel){
 }
 function fv(id){ return document.getElementById(id).value; }
 
-function editAsset(id){
-  var a = S.assets.find(function(x){ return x.id === id; }) || {cat:'stock'};
+function editAsset(id, cat){
+  var a = S.assets.find(function(x){ return x.id === id; }) || {cat:cat || 'stock'};
   openModal('<h3>'+(id?'자산 수정':'자산 추가')+'</h3>'+
     '<label class="f">이름<input id="f_name" value="'+esc(a.name)+'" placeholder="예: 거주 아파트"></label>'+
     '<label class="f">분류<select id="f_cat" onchange="document.getElementById(\'reBox\').style.display=this.value===\'realestate\'?\'block\':\'none\'">'+Object.keys(CATS).map(function(c){ return '<option value="'+c+'" '+(c===a.cat?'selected':'')+'>'+CATS[c]+'</option>'; }).join('')+'</select></label>'+
