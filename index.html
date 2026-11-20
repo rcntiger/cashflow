@@ -613,16 +613,24 @@ function viewDash(){
 
 function viewAssets(){
   var t = totals(), h = ownerChips();
-  h += kpis(Object.keys(CATS).filter(function(c){ return t.byCat[c] > 0; }).map(function(c){ return [CATS[c], fm(t.byCat[c]), '', t.assets ? Math.round(t.byCat[c]/t.assets*100)+'%' : '']; }).concat([['부채', '−'+fm(t.debts), 'neg']]));
+  var kc = {}; Object.keys(CATS).forEach(function(c){ var g = c === 'pension' ? 'stock' : c; kc[g] = (kc[g] || 0) + (t.byCat[c] || 0); });
+  h += kpis(Object.keys(kc).filter(function(c){ return kc[c] > 0; }).map(function(c){ return [c === 'stock' ? '주식·연금' : CATS[c], fm(kc[c]), '', t.assets ? Math.round(kc[c]/t.assets*100)+'%' : '']; }).concat([['부채', '−'+fm(t.debts), 'neg']]));
   // 자산: 카드 밖 큰 제목 줄 + 분류마다 카드
   h += '<div class="sec-h"><span class="ttl2">자산</span><span class="num sec-sum">'+fm(byOwner(S.assets).reduce(function(s,a){ return s + num(a.value); }, 0))+'</span><span style="flex:1"></span><button class="btn sm" onclick="editAsset()">+ 추가</button></div>';
   if(!byOwner(S.assets).length) h += '<div class="card"><div class="empty">'+(OWNER?'이 명의의 자산이 없습니다':'아직 자산이 없습니다')+'</div></div>';
+  var GROUP = {stock:['stock','pension'], pension:null};   // 리밸런서에서 함께 오는 주식·연금계좌는 한 카드
+  var GNAME = {stock:'주식·연금'};
   Object.keys(CATS).forEach(function(c){
-    var list = byOwner(S.assets).filter(function(a){ return a.cat === c; });
+    if(GROUP[c] === null) return;
+    var cats = GROUP[c] || [c];
+    var list = byOwner(S.assets).filter(function(a){ return cats.indexOf(a.cat) >= 0; })
+      .sort(function(a,b){ return cats.indexOf(a.cat) - cats.indexOf(b.cat); });
     if(!list.length) return;
-    h += '<div class="card"><div class="grp big cat-h"><span>'+CATS[c]+'</span><span><span class="num">'+fm(t.byCat[c])+'</span><button class="btn sub sm" style="margin-left:10px" onclick="editAsset(\'\',\''+c+'\')" aria-label="'+CATS[c]+' 추가">+</button></span></div>';
+    var gsum = cats.reduce(function(s,k){ return s + (t.byCat[k] || 0); }, 0);
+    h += '<div class="card"><div class="grp big cat-h"><span>'+(GNAME[c] || CATS[c])+'</span><span><span class="num">'+fm(gsum)+'</span><button class="btn sub sm" style="margin-left:10px" onclick="editAsset(\'\',\''+c+'\')" aria-label="'+CATS[c]+' 추가">+</button></span></div>';
     list.forEach(function(a){
       h += '<div class="row" onclick="editAsset(\''+a.id+'\')"><div class="m"><div class="t">'+esc(a.name)+
+        (cats.length > 1 ? '<span class="tag">'+(a.cat === 'pension' ? '연금' : '주식')+'</span>' : '')+
         (a.owner ? '<span class="tag">'+esc(nm(a.owner))+'</span>' : '')+(a.bucket ? '<span class="tag">'+BUCKETS[a.bucket].slice(0,1)+'</span>' : '')+(isRbAsset(a.id) ? '<span class="tag">리밸런서</span>' : '')+'</div>'+
         (a.note || a.src ? '<div class="tiny">'+esc([a.note, a.src].filter(Boolean).join(' · '))+'</div>' : '')+'</div><div class="v">'+fm(num(a.value))+(t.assets?'<span class="tiny pcI" style="display:inline-block;width:44px;text-align:right">'+Math.round(num(a.value)/t.assets*100)+'%</span>':'')+'</div></div>';
     });
