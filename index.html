@@ -758,7 +758,7 @@ function viewSim(){
     simField('그 전 월 저축액 (만원)', 'saveBefore', 'number', '10')+
     simField('기본 월 생활비 (만원)', 'spend', 'number', '10')+
     simField('계산 종료 연도', 'endYear', 'number', '1')+
-    '</div><div class="tiny">물가를 뺀 실질 기준입니다. 부동산은 빼고 금융자산(주식·연금계좌·공제회·현금)만 굴립니다. 생활비 시작 전에는 소득 항목 대신 월 저축액(대출 이자를 뺀 순저축)만 더하고, 시작 후에는 월 소득 − 월 생활비를 더하거나 뺍니다. 목돈 일정은 해당 월에 반영합니다.</div></div>';
+    '</div><div class="tiny">물가를 뺀 실질 기준 · 금융자산만 계산 (부동산 제외)<br>은퇴 전: 월 저축액 더함 · 은퇴 후: 월 소득 − 생활비<br>목돈은 해당 월 반영 · 모자라면 ② → ① → ③ 순서로 꺼내 씀</div></div>';
   var ph = sortedPhases();
   h += '<div class="card"><h2>생활비 계산 방식</h2><div class="chips" style="margin:0">'+
     '<button class="chip '+(s.spendMode!=='expenses'?'on':'')+'" onclick="setSim(\'spendMode\',\'manual\',\'month\')">직접 입력 (기본 + 구간)</button>'+
