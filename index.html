@@ -1543,6 +1543,13 @@ function childPlan(f){
   var uni = ymIdx(f.uniStart) != null ? ymIdx(f.uniStart) : ymIdx((by+19)+'-03');
   var years = num(f.uniYears) || 4, leave = num(f.leave) || 0;
   var army = null;
+  if(f.noUni){   // 대학 안 감: 고교 졸업까지, 군은 기본 만 20세 되는 해 3월
+    var hEnd = ymIdx((by+19)+'-02');
+    if(f.army !== 'none'){ var as0 = ymIdx(f.armyStart) != null ? ymIdx(f.armyStart) : ymIdx((by+20)+'-03'), am0 = num(f.armyMonths) || 18; army = {from:as0, to:as0 + am0 - 1}; }
+    var st0 = [{k:'중', a:mid, b:high-1}, {k:'고', a:high, b:hEnd}];
+    if(army) st0.push({k:'군', a:army.from, b:army.to});
+    return {mid:mid, high:high, uni:null, highEnd:hEnd, grad:hEnd, army:army, stages:st0, noUni:true};
+  }
   if(f.army !== 'none'){
     var as = ymIdx(f.armyStart) != null ? ymIdx(f.armyStart) : uni + 12, am = num(f.armyMonths) || 18;
     army = {from:as, to:as + am - 1};
@@ -1613,7 +1620,8 @@ function timelineMarks(){
     if(f.rel !== '자녀' || !f.birth) return;
     var c = childPlan(f); if(!c) return;
     var on = 'tlChild(\''+f.id+'\')', nm0 = famName(f);
-    var ev = [[c.mid, '중학교 입학'], [c.high, '고등학교 입학'], [c.uni, '대학 입학'], [c.grad, '대학 졸업']];
+    var ev = c.noUni ? [[c.mid, '중학교 입학'], [c.high, '고등학교 입학'], [c.highEnd, '고등학교 졸업']]
+                     : [[c.mid, '중학교 입학'], [c.high, '고등학교 입학'], [c.uni, '대학 입학'], [c.grad, '대학 졸업']];
     if(c.army) ev.push([c.army.from, '입대'], [c.army.to + 1, '전역']);
     ev.forEach(function(e){ if(e[0] != null && e[0] >= now) out.push({i:e[0], t:nm0+' '+e[1], on:on}); });
   });
@@ -1695,21 +1703,23 @@ function savePension(fid){
 function tlChild(fid){
   var f = S.family.find(function(x){ return x.id === fid; }), c = childPlan(f), noArmy = f.army === 'none';
   openModal('<h3>'+esc(famName(f))+' 학업·군 일정</h3>'+
-    '<div class="tiny" style="margin-bottom:10px">중 '+ymDot(idxYm(c.mid))+' · 고 '+ymDot(idxYm(c.high))+' · 고교 졸업 '+ymDot(idxYm(c.highEnd))+' · 대학 졸업 '+ymDot(idxYm(c.grad))+'</div>'+
-    monthField('f_uni', '대학 입학 (재수면 1년 뒤로)', idxYm(c.uni))+
+    '<div class="tiny" style="margin-bottom:10px">중 '+ymDot(idxYm(c.mid))+' · 고 '+ymDot(idxYm(c.high))+' · 고교 졸업 '+ymDot(idxYm(c.highEnd))+(c.noUni ? '' : ' · 대학 졸업 '+ymDot(idxYm(c.grad)))+'</div>'+
+    '<label class="chk"><input type="checkbox" id="f_nouni" '+(f.noUni?'checked':'')+'> 대학 진학 안 함 (대학 일정 삭제)</label>'+
+    monthField('f_uni', '대학 입학 (재수면 1년 뒤로)', idxYm(c.uni != null ? c.uni : ymIdx((+f.birth.slice(0,4)+19)+'-03')))+
     '<div class="grid2"><label class="f">대학 학년 수<input id="f_years" type="number" inputmode="numeric" value="'+(num(f.uniYears)||4)+'"></label>'+
     '<label class="f">휴학 (개월)<input id="f_leave" type="number" inputmode="numeric" value="'+(num(f.leave)||0)+'"></label></div>'+
     '<label class="chk"><input type="checkbox" id="f_noarmy" '+(noArmy?'checked':'')+'> 군 복무 없음</label>'+
-    monthField('f_army', '입대 월 (기본: 대학 1학년 마치고)', c.army ? idxYm(c.army.from) : idxYm(c.uni + 12))+
+    monthField('f_army', '입대 월 (기본: 대학 1학년 마치고, 대학 안 가면 만 20세 3월)', c.army ? idxYm(c.army.from) : idxYm(c.uni != null ? c.uni + 12 : ymIdx((+f.birth.slice(0,4)+20)+'-03')))+
     '<label class="f">복무 기간 (개월)<input id="f_am" type="number" inputmode="numeric" value="'+(num(f.armyMonths)||18)+'"></label>'+
     '<div class="tiny" style="margin-bottom:10px">전역 뒤 3월·9월에 복학하는 것으로 계산합니다. 고정지출에서 \'끝 월을 자녀 일정에 연결\'한 항목은 졸업 월이 바뀌면 함께 바뀝니다.</div>'+
     '<div class="btns"><button class="btn" onclick="saveChild(\''+fid+'\')">저장</button><button class="btn sub" onclick="closeModal()">취소</button></div>');
 }
 function saveChild(fid){
   var f = S.family.find(function(x){ return x.id === fid; });
+  f.noUni = document.getElementById('f_nouni').checked;
   f.uniStart = fv('f_uni'); f.uniYears = num(fv('f_years')) || 4; f.leave = num(fv('f_leave')) || 0;
   f.army = document.getElementById('f_noarmy').checked ? 'none' : 'manual'; f.armyStart = fv('f_army'); f.armyMonths = num(fv('f_am')) || 18;
-  closeModal(); commit(); var c = childPlan(f); toast(f.name+' 대학 졸업 '+ymDot(idxYm(c.grad)));
+  closeModal(); commit(); var c = childPlan(f); toast(f.name+(c.noUni ? ' 고교 졸업 ' : ' 대학 졸업 ')+ymDot(idxYm(c.grad)));
 }
 
 /* ════════ 가족 나이 ════════ */
