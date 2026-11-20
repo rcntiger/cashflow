@@ -663,18 +663,10 @@ function viewAssets(){
 
 function viewFlow(){
   var cur = nowIdx(), y0 = Math.floor(cur/12), y1 = num(S.sim.endYear), life = ymIdx(S.sim.lifeStart);
-  var bars = [];
-  for(var y = y0; y <= y1; y++){
-    var tot = 0; for(var m = 0; m < 12; m++) tot += incomeAt(y*12+m);
-    var sps = [], m2; for(m2 = 0; m2 < 12; m2++){ var s2 = spendAt(y*12+m2); if(s2 != null) sps.push(s2); }
-    var avg = tot/12, sp = sps.length ? sum(sps)/sps.length : null;
-    bars.push({x:String(y).slice(2), v:avg, line:sp, c: sp != null && avg < sp ? 'var(--warn)' : 'var(--c1)'});
-  }
   var per0 = incomePeriods(), gaps = per0.filter(function(p){ return p.s != null; }).map(function(p){ return p.v - p.s; });
   var worst = gaps.length ? Math.min.apply(null, gaps) : 0;
   var h = kpis([['지금 월 소득', fm(incomeAt(cur))], ['은퇴 후 월 소득', life != null ? fm(incomeAt(life)) : '–', '', life != null ? ymDot(S.sim.lifeStart)+'부터' : ''], ['은퇴 후 월 생활비', life != null && spendAt(life) != null ? fm(spendAt(life)) : '–'], ['가장 모자란 구간', worst < 0 ? fm(worst) : '없음', worst < 0 ? 'neg' : 'pos', '월 기준']]);
-  h += viewTimeline() + '<div class="card"><h2>연도별 가계 월 소득</h2>'+barChart(bars)+
-    '<div class="legend"><span><i style="background:var(--c1)"></i>월 소득 ≥ 생활비</span><span><i style="background:var(--warn)"></i>생활비보다 부족</span><span><i style="background:var(--bad)"></i>월 생활비 (점선)</span></div></div>';
+  h += viewTimeline();
   var per = incomePeriods();
   // 모바일에서 줄바꿈되지 않게: 기간은 '26.11~32.12, 금액은 만원 단위 숫자만
   var yy = function(i){ var s = idxYm(i); return s.slice(2,4)+'.'+s.slice(5); };
