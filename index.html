@@ -615,6 +615,7 @@ function viewAssets(){
   var t = totals(), h = ownerChips();
   var kc = {}; Object.keys(CATS).forEach(function(c){ var g = c === 'pension' ? 'stock' : c; kc[g] = (kc[g] || 0) + (t.byCat[c] || 0); });
   h += kpis(Object.keys(kc).filter(function(c){ return kc[c] > 0; }).map(function(c){ return [c === 'stock' ? '주식·연금' : CATS[c], fm(kc[c]), '', t.assets ? Math.round(kc[c]/t.assets*100)+'%' : '']; }).concat([['부채', '−'+fm(t.debts), 'neg']]));
+  h += '<!--SUM-->';   // 맨 위: 총자산·순자산·명의별 자산 (아래에서 채움)
   // 자산: 카드 밖 큰 제목 줄 + 분류마다 카드
   h += '<div class="sec-h"><span class="ttl2">자산</span><span class="num sec-sum">'+fm(byOwner(S.assets).reduce(function(s,a){ return s + num(a.value); }, 0))+'</span><span style="flex:1"></span><button class="btn sm" onclick="editAsset()">+ 추가</button></div>';
   if(!byOwner(S.assets).length) h += '<div class="card"><div class="empty">'+(OWNER?'이 명의의 자산이 없습니다':'아직 자산이 없습니다')+'</div></div>';
@@ -653,8 +654,10 @@ function viewAssets(){
   var ownRows = Object.keys(own).sort(function(a,b){ return own[b]-own[a]; }).map(function(k){ var pct = t.assets ? own[k]/t.assets*100 : 0;
     return '<div style="margin-top:10px"><div style="display:flex;font-size:var(--f-sm)"><span>'+esc(nm(k))+'</span><span class="sp" style="flex:1"></span><span class="num">'+fm(own[k])+' <span class="tiny">'+Math.round(pct)+'%</span></span></div>'+
       '<div style="height:6px;background:var(--s3);border-radius:99px;margin-top:4px;overflow:hidden"><div style="height:100%;width:'+pct+'%;background:var(--accent)"></div></div></div>'; }).join('');
-  h += '</div><div class="card R"><div class="grid2"><div class="kv"><div class="k">총자산</div><div class="v">'+fm(t.assets)+'</div></div><div class="kv"><div class="k">순자산</div><div class="v">'+fm(t.net)+'</div></div></div>'+
+  h += '</div>';
+  var sumCard = '<div class="card R"><div class="grid2"><div class="kv"><div class="k">총자산</div><div class="v">'+fm(t.assets)+'</div></div><div class="kv"><div class="k">순자산</div><div class="v">'+fm(t.net)+'</div></div></div>'+
     (ownRows ? '<h2 style="margin-top:14px">명의별 자산</h2>'+ownRows : '')+'<div class="tiny" style="margin-top:10px">금액 단위는 만원입니다</div></div>';
+  h = h.replace('<!--SUM-->', sumCard);
   return h;
 }
 
