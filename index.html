@@ -1428,7 +1428,10 @@ function periodIncomeCard(){
       '<div class="pl1"><span class="pper">'+yy(p.from)+'~'+(last.to >= endAll ? '' : yy(last.to))+'</span><span class="ptot">'+vTxt+'</span>'+
       (sTxt ? '<span class="psp">'+(after ? '생활비' : '고정지출')+' '+sTxt+(p.pre?'*':'')+'</span><span class="pdf '+(gmin<0?'neg':'pos')+'">'+(gmin === gmax ? sg(gmin) : sg(gmin)+'~'+((gmin<0)===(gmax<0) ? nmv(Math.abs(gmax)) : sg(gmax)))+'</span>' : '')+'</div>';
     // 소득 칩 (구간 시작 기준)
-    var inc = activeInc(i), chips = inc.map(function(x){ return '<span class="pchip" onclick="editIncome(\''+x.id+'\')">'+esc(label(x))+'<b>'+nmv(incomeItemAt(x, i, true))+'</b></span>'; });
+    var inc = activeInc(i), isMain = function(x){ return isSalary(x) || /연금|공로|급여|근로/.test(x.name); };
+    var chips = inc.filter(isMain).map(function(x){ return '<span class="pchip" onclick="editIncome(\''+x.id+'\')">'+esc(label(x))+'<b>'+nmv(incomeItemAt(x, i, true))+'</b></span>'; });
+    var etc = inc.filter(function(x){ return !isMain(x); });   // 월세 등은 '기타 소득' 하나로
+    if(etc.length) chips.push('<span class="pchip" onclick="editIncome(\''+etc[0].id+'\')">기타 소득<b>'+nmv(sum(etc, function(x){ return incomeItemAt(x, i, true); }))+'</b></span>');
     (S.members || []).forEach(function(m){
       var k = m.name, mine = S.incomes.filter(function(x){ return x.owner === k; });
       if(!mine.length || inc.some(function(x){ return x.owner === k; })) return;
@@ -1436,13 +1439,6 @@ function periodIncomeCard(){
       if(before && later) chips.push('<span class="pchip gapc">'+esc(nm(k))+' 공백</span>');
     });
     h += '<div class="pl2">'+chips.join('')+'</div>';
-    // 구간 안의 작은 변화
-    var ch = [];
-    for(var k = 1; k < g.ps.length; k++){
-      var a = g.ps[k-1].from, b = g.ps[k].from, when = yy(b);
-      if(g.ps[k].v !== g.ps[k-1].v) ch.push('소득 '+nmv(g.ps[k-1].v)+'→'+nmv(g.ps[k].v)+' '+when);
-    }
-    if(ch.length) h += '<div class="pchg">'+ch.map(function(t){ return '<span>'+esc(t)+'</span>'; }).join('')+'</div>';
     h += '</div>';
   });
   h += '<div class="tiny" style="margin-top:8px">단위 만원 · 급여는 월 환산 · * 은퇴 전은 월 고정지출 합계 · 칩을 누르면 수정</div>';
