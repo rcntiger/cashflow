@@ -85,6 +85,8 @@ h2.ttl{font-size:19px;font-weight:800;color:var(--accent);padding-left:10px;bord
 .prow.key{border-top:2px solid var(--warn)}
 .pev{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:6px}
 .pev span{font-size:var(--f-xs);font-weight:700;color:#1a1205;background:var(--warn);padding:2px 9px;border-radius:99px}
+.pchg{display:flex;flex-wrap:wrap;gap:4px 10px;margin-top:6px;font-size:var(--f-xs);color:var(--t2)}
+.pchg span::before{content:'· '}
 .pchip.gapc{background:transparent;border:1px solid var(--warn);color:var(--warn);cursor:default}
 .grp.big{font-size:19px;font-weight:700;color:var(--t1);margin:20px 2px 4px;padding-bottom:6px;border-bottom:1px solid var(--bd)}
 .grp.big:first-of-type{margin-top:4px}
@@ -1409,32 +1411,49 @@ function periodIncomeCard(){
   var label = function(x){ var o = x.owner && x.owner !== '공동' ? nm(x.owner) : ''; var n = String(x.name).replace(/^(내|아내|본인|배우자)\s*/, ''); return (o ? o+' ' : '')+n; };
   var h = '<div class="card"><h2>시기별 월 소득<span class="sp"></span><button class="btn sub sm" onclick="editExpense()">+ 지출</button><button class="btn sm" style="margin-left:6px" onclick="editIncome()">+ 소득</button></h2>';
   if(!per.length) h += '<div class="empty">연금·급여·월세처럼 매달 들어오는 돈을 넣으세요</div>';
-  per.forEach(function(p){
-    var i = p.from, after = !p.pre && p.s != null, gap = p.s != null ? p.v - p.s : null;
-    var evs = periodEvents(p.from);
-    h += '<div class="prow'+(evs.length?' key':'')+'">'+(evs.length ? '<div class="pev">'+evs.map(function(t){ return '<span>'+esc(t)+'</span>'; }).join('')+'</div>' : '')+'<div class="pl1"><span class="pper">'+yy(p.from)+'~'+(p.to >= endAll ? '' : yy(p.to))+'</span><span class="ptot">'+nmv(p.v)+'</span>'+
-      (p.s != null ? '<span class="psp">'+(after ? '생활비' : '고정지출')+' '+nmv(p.s)+(p.pre?'*':'')+'</span><span class="pdf '+(gap<0?'neg':'pos')+'">'+(gap>=0?'+':'−')+nmv(Math.abs(gap))+'</span>' : '')+'</div>';
-    // 소득 칩
+  // 강조 시기(은퇴·공로연수·연금·생활비 시작·고교 졸업) 사이는 한 줄로 묶고, 그 사이 작은 변화는 칩으로 요약
+  var cats = Object.keys(EXP_CATS).filter(function(c){ return c !== 'saving'; });
+  var expBy = function(i){ var o = {}; cats.forEach(function(c){ o[c] = sum(S.expenses.filter(function(x){ return x.cat === c && expActive(x, i); }), function(x){ return num(x.monthly); }); }); return o; };
+  var groups = [];
+  per.forEach(function(p, k){ var ev = periodEvents(p.from); if(!groups.length || ev.length) groups.push({ev:ev, ps:[p]}); else groups[groups.length-1].ps.push(p); });
+  groups.forEach(function(g){
+    var p = g.ps[0], last = g.ps[g.ps.length-1], i = p.from, after = !p.pre && p.s != null;
+    var gaps = g.ps.filter(function(q){ return q.s != null; }).map(function(q){ return q.v - q.s; });
+    var gmin = gaps.length ? Math.min.apply(null, gaps) : null, gmax = gaps.length ? Math.max.apply(null, gaps) : null;
+    var sg = function(v){ return (v>=0?'+':'−')+nmv(Math.abs(v)); };
+    var sVals = g.ps.map(function(q){ return q.s; }).filter(function(v){ return v != null; });
+    var sTxt = sVals.length ? (sVals[0] === sVals[sVals.length-1] ? nmv(sVals[0]) : nmv(sVals[0])+'→'+nmv(sVals[sVals.length-1])) : '';
+    var vTxt = p.v === last.v ? nmv(p.v) : nmv(p.v)+'→'+nmv(last.v);
+    h += '<div class="prow'+(g.ev.length?' key':'')+'">'+(g.ev.length ? '<div class="pev">'+g.ev.map(function(t){ return '<span>'+esc(t)+'</span>'; }).join('')+'</div>' : '')+
+      '<div class="pl1"><span class="pper">'+yy(p.from)+'~'+(last.to >= endAll ? '' : yy(last.to))+'</span><span class="ptot">'+vTxt+'</span>'+
+      (sTxt ? '<span class="psp">'+(after ? '생활비' : '고정지출')+' '+sTxt+(p.pre?'*':'')+'</span><span class="pdf '+(gmin<0?'neg':'pos')+'">'+(gmin === gmax ? sg(gmin) : sg(gmin)+'~'+((gmin<0)===(gmax<0) ? nmv(Math.abs(gmax)) : sg(gmax)))+'</span>' : '')+'</div>';
+    // 소득 칩 (구간 시작 기준)
     var inc = activeInc(i), chips = inc.map(function(x){ return '<span class="pchip" onclick="editIncome(\''+x.id+'\')">'+esc(label(x))+'<b>'+nmv(incomeItemAt(x, i, true))+'</b></span>'; });
-    // 소득이 끊긴 사람 (앞뒤로 소득이 있는데 이 기간에 없음)
     (S.members || []).forEach(function(m){
       var k = m.name, mine = S.incomes.filter(function(x){ return x.owner === k; });
       if(!mine.length || inc.some(function(x){ return x.owner === k; })) return;
-      var before = mine.some(function(x){ var e = incEnd(x); return e != null && e < i; }), later = mine.some(function(x){ var s = ymIdx(x.start); return s != null && s > p.to; });
+      var before = mine.some(function(x){ var e = incEnd(x); return e != null && e < i; }), later = mine.some(function(x){ var s = ymIdx(x.start); return s != null && s > last.to; });
       if(before && later) chips.push('<span class="pchip gapc">'+esc(nm(k))+' 공백</span>');
     });
     h += '<div class="pl2">'+chips.join('')+'</div>';
-    // 고정지출 칩 (은퇴 전) / 생활비 가정 (은퇴 후)
     if(p.pre){
-      var ex = Object.keys(EXP_CATS).filter(function(c){ return c !== 'saving'; }).map(function(c){
-        return {c:c, v:sum(S.expenses.filter(function(x){ return x.cat === c && expActive(x, i); }), function(x){ return num(x.monthly); })}; }).filter(function(o){ return o.v > 0; })
-        .sort(function(a,b){ return b.v - a.v; });
-      var dc = debtCostAt(i);
-      h += '<div class="pl2">'+ex.map(function(o){ return '<span class="pchip outc" onclick="openExpCat(\''+o.c+'\')">'+EXP_CATS[o.c]+'<b>'+nmv(o.v)+'</b></span>'; }).join('')+
+      var e0 = expBy(i), dc = debtCostAt(i);
+      h += '<div class="pl2">'+cats.filter(function(c){ return e0[c] > 0; }).sort(function(a,b){ return e0[b] - e0[a]; }).map(function(c){ return '<span class="pchip outc" onclick="openExpCat(\''+c+'\')">'+EXP_CATS[c]+'<b>'+nmv(e0[c])+'</b></span>'; }).join('')+
         (dc ? '<span class="pchip outc">대출<b>'+nmv(dc)+'</b></span>' : '')+'</div>';
     } else if(after){
       h += '<div class="pl2"><span class="pchip outc" onclick="go(\'sim\')">생활비 가정 (시뮬)<b>'+nmv(p.s)+'</b></span></div>';
     }
+    // 구간 안의 작은 변화
+    var ch = [];
+    for(var k = 1; k < g.ps.length; k++){
+      var a = g.ps[k-1].from, b = g.ps[k].from, when = yy(b);
+      if(g.ps[k].pre){ var ea = expBy(a), eb = expBy(b);
+        cats.forEach(function(c){ if(ea[c] !== eb[c]) ch.push(EXP_CATS[c]+(eb[c] ? ' '+nmv(ea[c])+'→'+nmv(eb[c]) : ' 끝')+' '+when); });
+        var da = debtCostAt(a), db = debtCostAt(b); if(da !== db) ch.push('대출'+(db ? ' '+nmv(da)+'→'+nmv(db) : ' 끝')+' '+when);
+      } else if(g.ps[k].s !== g.ps[k-1].s && g.ps[k].s != null && g.ps[k-1].s != null) ch.push('생활비 '+nmv(g.ps[k-1].s)+'→'+nmv(g.ps[k].s)+' '+when);
+      if(g.ps[k].v !== g.ps[k-1].v) ch.push('소득 '+nmv(g.ps[k-1].v)+'→'+nmv(g.ps[k].v)+' '+when);
+    }
+    if(ch.length) h += '<div class="pchg">'+ch.map(function(t){ return '<span>'+esc(t)+'</span>'; }).join('')+'</div>';
     h += '</div>';
   });
   h += '<div class="tiny" style="margin-top:8px">단위 만원 · 급여는 월 환산 · * 은퇴 전은 월 고정지출 합계(참고) · 칩을 누르면 수정</div>';
