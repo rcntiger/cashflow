@@ -107,6 +107,7 @@ h2.ttl{font-size:19px;font-weight:800;color:var(--accent);padding-left:10px;bord
 .pdelta{font-size:var(--f-xs);color:var(--t2);margin:-4px 0 6px}
 .pcov{font-size:var(--f-xs);margin:-2px 0 8px;padding:6px 9px;border-radius:8px;background:var(--s2)}
 .pcov b{white-space:nowrap}
+a.btn{text-decoration:none;display:inline-flex;align-items:center;justify-content:center}
 .pchip.gapc{background:transparent;border:1px solid var(--warn);color:var(--warn);cursor:default}
 .rrow{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:var(--f-sm);color:var(--t2);margin:-2px 0 10px}
 .rrow input{width:76px;padding:6px 8px;border-radius:8px;border:1px solid var(--bd);background:var(--s2);color:var(--t1);font-size:var(--f-md);text-align:right}
@@ -310,7 +311,8 @@ function loadMeta(){ try{ return JSON.parse(localStorage.getItem(LS_META)) || {}
 function saveMeta(){ localStorage.setItem(LS_META, JSON.stringify(META)); }
 
 function commit(){              // 데이터가 바뀔 때마다 호출
-  localStorage.setItem(LS_DATA, JSON.stringify(S));
+  try{ localStorage.setItem(LS_DATA, JSON.stringify(S)); }
+  catch(e){ alert('이 기기에 저장하지 못했습니다 (' + (e && e.name || '오류') + ').\n브라우저 저장 공간을 확인하거나 ⚙ 설정 → 내보내기로 백업해 두세요.'); }
   META.dirty = true; saveMeta();
   render();
   cloudSchedule();
@@ -318,6 +320,7 @@ function commit(){              // 데이터가 바뀔 때마다 호출
 
 /* ════════ 유틸 ════════ */
 function esc(s){ return String(s == null ? '' : s).replace(/[&<>"']/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; }); }
+function safeUrl(u){ u = String(u || '').trim(); return /^https:\/\/[^\s"'<>]+$/i.test(u) ? u : ''; }
 function uid(){ return Math.random().toString(36).slice(2,10); }
 function num(v){ var n = parseFloat(String(v).replace(/,/g,'')); return isFinite(n) ? n : 0; }
 // 금액 단위: 만원
@@ -961,7 +964,7 @@ function editAsset(id, cat){
       '<label class="f">법정동 (선택, 같은 이름 단지 구분용)<input id="f_dong" value="'+esc(a.dong)+'" placeholder="예: 범박동"></label>'+
       '<label class="f">KB부동산 단지 주소 (선택)<input id="f_kb" type="url" value="'+esc(a.kbUrl)+'" placeholder="https://kbland.kr/c/..."></label>'+
       '<div class="tiny">시군구 코드는 <a href="https://www.code.go.kr/stdcode/regCodeL.do" target="_blank" rel="noopener" style="color:var(--accent)">법정동코드 조회</a>에서 법정동코드 앞 5자리입니다</div>'+
-      (id ? '<div class="btns"><button class="btn sub sm" onclick="saveAsset(\''+id+'\',true)">저장 후 실거래가 조회</button>'+(a.kbUrl?'<button class="btn sub sm" onclick="window.open(\''+esc(a.kbUrl)+'\',\'_blank\')">KB 시세 열기</button>':'')+'</div>' : '<div class="tiny" style="margin-top:6px">저장한 뒤 다시 열면 실거래가를 조회할 수 있습니다</div>')+
+      (id ? '<div class="btns"><button class="btn sub sm" onclick="saveAsset(\''+id+'\',true)">저장 후 실거래가 조회</button>'+(safeUrl(a.kbUrl)?'<a class="btn sub sm" href="'+esc(safeUrl(a.kbUrl))+'" target="_blank" rel="noopener">KB 시세 열기</a>':'')+'</div>' : '<div class="tiny" style="margin-top:6px">저장한 뒤 다시 열면 실거래가를 조회할 수 있습니다</div>')+
     '</div></div>'+
     (id && isRbAsset(id) ? '<div class="tiny" style="margin-bottom:10px">리밸런서 계좌와 연결됨 — 평가액은 불러오기로 갱신</div>' : '')+
     '<div class="btns"><button class="btn" onclick="saveAsset(\''+(id||'')+'\')">저장</button><button class="btn sub" onclick="closeModal()">취소</button>'+
@@ -1194,7 +1197,8 @@ function cloudSchedule(){
 // 같은 시각인지 비교 (서버는 +00:00, 앱은 Z 로 적어 글자로는 다를 수 있음)
 function sameTime(a, b){ return !!a && !!b && Date.parse(a) === Date.parse(b); }
 async function cloudPush(){
-  if(!sb || !_user || _busy) return;
+  if(!sb || !_user) return;
+  if(_busy){ cloudSchedule(); return; }   // 동기화 중이면 버리지 않고 잠시 뒤 다시
   _busy = true; setCloud('saving');
   try{
     // 다른 사람이 먼저 바꿨는지 확인 (마지막으로 받은 시각과 비교)
@@ -1244,7 +1248,7 @@ async function cloudPull(manual){
     } else if(sameTime(r.data.updated_at, META.base)){ // 서버 변화 없음
       META.by = r.data.updated_by || META.by; META.at = r.data.updated_at; saveMeta();
       if(META.dirty) await cloudPush(); else { setCloud('saved'); render(); }
-    } else if(META.dirty && (S.assets.length || S.incomes.length)){
+    } else if(META.dirty){
       await resolveConflict();
     } else {
       applyServer(r.data);
@@ -1341,7 +1345,7 @@ async function fetchTrades(id, months){
       (n > 15 ? '<div class="tiny" style="margin-top:4px">최근 15건만 표시</div>' : '');
   }
   h += '<div class="btns">'+(n?'<button class="btn" onclick="applyTrade()">중간값으로 반영</button>':'')+(months<12?'<button class="btn sub" onclick="fetchTrades(\''+id+'\',12)">12개월로 다시</button>':'')+
-    (a.kbUrl?'<button class="btn sub" onclick="window.open(\''+esc(a.kbUrl)+'\',\'_blank\')">KB 시세</button>':'')+'<button class="btn sub" onclick="closeModal()">닫기</button></div>';
+    (safeUrl(a.kbUrl)?'<a class="btn sub" href="'+esc(safeUrl(a.kbUrl))+'" target="_blank" rel="noopener">KB 시세</a>':'')+'<button class="btn sub" onclick="closeModal()">닫기</button></div>';
   openModal(h);
 }
 function applyTrade(){
@@ -1470,7 +1474,12 @@ function periodEvents(i){
 }
 // 예상 월 소득 및 지출: 맨 위 비례 막대 + 구간마다 소득 − 지출 = 월 잉여 (강조 시기 사이는 한 구간으로)
 function periodIncomeCard(){
-  var per = incomePeriods(), endAll = num(S.sim.endYear)*12 + 11;
+  var endAll = num(S.sim.endYear)*12 + 11, per = [];
+  incomePeriods().forEach(function(q){   // 금액이 같아도 은퇴·연금 시작 같은 일이 있는 달은 따로 구간으로
+    var cur = {from:q.from, to:q.to, v:q.v, s:q.s, pre:q.pre};
+    for(var m = q.from + 1; m <= q.to; m++) if(periodEvents(m).length){ cur.to = m - 1; per.push(cur); cur = {from:m, to:q.to, v:q.v, s:q.s, pre:q.pre}; }
+    per.push(cur);
+  });
   var yy = function(i){ var s = idxYm(i); return s.slice(2,4)+'.'+s.slice(5); };
   var nmv = function(v){ return HIDE ? '••••' : Math.round(v).toLocaleString('ko-KR'); };
   var sg = function(v){ return (v >= 0 ? '+' : '−') + nmv(Math.abs(v)); };
@@ -1498,7 +1507,7 @@ function periodIncomeCard(){
     g.net = g.a.s != null ? g.a.v - g.a.s : null;
     var nets = g.ps.filter(function(q){ return q.s != null; }).map(function(q){ return q.v - q.s; });
     g.max = nets.length ? Math.max.apply(null, nets) : null; g.min = nets.length ? Math.min.apply(null, nets) : null;
-    g.cum = sum(g.ps.filter(function(q){ return q.s != null; }), function(q){ return (q.v - q.s) * (Math.min(q.to, endAll) - q.from + 1); });
+    g.cum = sum(g.ps.filter(function(q){ return q.s != null; }), function(q){ return Math.min(0, q.v - q.s) * (Math.min(q.to, endAll) - q.from + 1); });   // 적자 달만 더함
   });
   var h = '<div class="card"><h2>예상 월 소득 및 지출<span class="sp"></span><button class="btn sub sm" onclick="editExpense()">+ 지출</button><button class="btn sm" style="margin-left:6px" onclick="editIncome()">+ 소득</button></h2>';
   if(!groups.length) return h + '<div class="empty">연금·급여·월세처럼 매달 들어오는 돈을 넣으세요</div></div>';
