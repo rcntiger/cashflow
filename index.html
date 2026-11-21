@@ -116,7 +116,7 @@ th:first-child,td:first-child{text-align:left}
 th{color:var(--t2);font-weight:500;font-size:var(--f-xs)}
 td{font-family:var(--mono);white-space:nowrap}
 label.f{display:block;margin-bottom:10px;font-size:var(--f-sm);color:var(--t2)}
-label.f input,label.f select{display:block;width:100%;margin-top:4px;padding:10px;border-radius:10px;border:1px solid var(--bd);background:var(--s2);color:var(--t1);font-size:var(--f-md)}
+.inp,label.f input,label.f select{display:block;width:100%;margin-top:4px;padding:10px;border-radius:10px;border:1px solid var(--bd);background:var(--s2);color:var(--t1);font-size:var(--f-md)}
 label.chk{display:flex;align-items:center;gap:8px;margin-bottom:10px;font-size:var(--f-sm)}
 label.chk input{width:20px;height:20px}
 .modal{position:fixed;inset:0;z-index:50;background:rgba(0,0,0,.55);display:none;align-items:flex-end;justify-content:center}
@@ -442,7 +442,48 @@ function spendAt(i){
 }
 // 고정지출 합계 (저축 분류 제외)
 var EXP_COLOR = {living:'var(--c0)', allowance:'var(--c2)', meal:'#f08c6c', family:'var(--c1)', insurance:'var(--c3)', edu:'var(--c4)', house:'var(--c5)', telecom:'#7c8cf0', tax:'var(--t2)', etc:'var(--t3, var(--t2))'};
-var EXP_CATS = {living:'생활비', insurance:'보험료', edu:'교육비', house:'관리비', telecom:'통신비', tax:'세금', allowance:'용돈', meal:'식대', family:'양가 지원', saving:'저축 (지출 아님)', etc:'기타'};
+var EXP_DEFAULT = {living:'생활비', insurance:'보험료', edu:'교육비', house:'관리비', telecom:'통신비', tax:'세금', allowance:'용돈', meal:'식대', family:'양가 지원', saving:'저축 (지출 아님)', etc:'기타'};
+var EXP_CATS = Object.assign({}, EXP_DEFAULT);
+// 지출 분류: 기본 + 내가 만든 분류, 이름 바꾸기·숨기기 (S.catCfg = {키:{name, hidden}}, S.catCustom = [{k, name}])
+function applyCats(){
+  var cfg = (typeof S !== 'undefined' && S && S.catCfg) || {}, cus = (typeof S !== 'undefined' && S && S.catCustom) || [];
+  EXP_CATS = {};
+  Object.keys(EXP_DEFAULT).forEach(function(k){ if(k !== 'saving' && k !== 'etc') EXP_CATS[k] = (cfg[k] && cfg[k].name) || EXP_DEFAULT[k]; });
+  cus.forEach(function(c){ EXP_CATS[c.k] = (cfg[c.k] && cfg[c.k].name) || c.name; if(!EXP_COLOR[c.k]) EXP_COLOR[c.k] = ['#5fb3c7','#c78f5f','#9f7ae0','#7ac77a','#e07aa8'][Object.keys(EXP_COLOR).length % 5]; });
+  EXP_CATS.etc = (cfg.etc && cfg.etc.name) || EXP_DEFAULT.etc;
+  EXP_CATS.saving = (cfg.saving && cfg.saving.name) || EXP_DEFAULT.saving;
+}
+function catHidden(c){ return !!(S.catCfg && S.catCfg[c] && S.catCfg[c].hidden) && !S.expenses.some(function(x){ return x.cat === c; }); }
+function openCatMgr(){
+  applyCats();
+  openModal('<h3>지출 분류 관리</h3><div class="tiny" style="margin-bottom:10px">이름을 바꾸거나, 쓰지 않는 분류를 숨기거나, 새 분류를 만듭니다. 항목이 들어 있는 분류는 숨겨도 목록에 남습니다</div>'+
+    Object.keys(EXP_CATS).map(function(c){
+      var cus = (S.catCustom || []).some(function(x){ return x.k === c; }), cnt = S.expenses.filter(function(x){ return x.cat === c; }).length, hid = !!(S.catCfg && S.catCfg[c] && S.catCfg[c].hidden);
+      return '<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px"><input class="inp" id="cat_'+c+'" value="'+esc(EXP_CATS[c])+'" style="flex:1;margin:0;padding:8px">'+
+        '<label class="tiny" style="white-space:nowrap"><input type="checkbox" id="cath_'+c+'" '+(hid?'checked':'')+'> 숨김</label>'+
+        (cus && !cnt ? '<button class="btn bad sm" onclick="delCat(\''+c+'\')">삭제</button>' : '<span class="tiny" style="width:44px;text-align:right">'+(cnt?cnt+'건':'')+'</span>')+'</div>'; }).join('')+
+    '<div style="display:flex;gap:8px;margin-top:12px"><input class="inp" id="cat_new" placeholder="새 분류 이름 (예: 반려동물)" style="flex:1;margin:0;padding:8px"><button class="btn sub sm" onclick="addCat()">+ 분류</button></div>'+
+    '<div class="btns"><button class="btn" onclick="saveCats()">저장</button><button class="btn sub" onclick="closeModal()">취소</button></div>');
+}
+function saveCats(){
+  S.catCfg = S.catCfg || {};
+  Object.keys(EXP_CATS).forEach(function(c){
+    var n = fv('cat_'+c).trim(), hid = document.getElementById('cath_'+c).checked, base = EXP_DEFAULT[c] || ((S.catCustom || []).find(function(x){ return x.k === c; }) || {}).name;
+    var o = {}; if(n && n !== base) o.name = n; if(hid) o.hidden = true;
+    if(Object.keys(o).length) S.catCfg[c] = o; else delete S.catCfg[c];
+  });
+  applyCats(); closeModal(); commit(); toast('지출 분류를 저장했습니다');
+}
+function addCat(){
+  var n = fv('cat_new').trim(); if(!n) return;
+  S.catCustom = S.catCustom || []; S.catCustom.push({k:'c'+Date.now().toString(36), name:n});
+  applyCats(); commit(); openCatMgr();
+}
+function delCat(c){
+  if(S.expenses.some(function(x){ return x.cat === c; })) return;
+  S.catCustom = (S.catCustom || []).filter(function(x){ return x.k !== c; }); if(S.catCfg) delete S.catCfg[c];
+  applyCats(); commit(); openCatMgr();
+}
 function expEnd(x){ var l = linkEnd(x); return l != null ? l : ymIdx(x.end); }
 function expActive(x, i){ var s = ymIdx(x.start), e = expEnd(x); return (s == null || s <= i) && (e == null || i <= e); }
 function expenseAt(i){ return sum(S.expenses.filter(function(x){ return x.cat !== 'saving' && expActive(x, i); }), function(x){ return num(x.monthly); }); }
@@ -522,6 +563,7 @@ function barChart(bars, line){
 
 /* ════════ 화면 ════════ */
 function render(){
+  applyCats();
   var hb = document.getElementById('hideBtn'); if(hb){ hb.textContent = HIDE ? '🙈' : '👁'; hb.title = HIDE ? '금액 보이기' : '금액 숨기기'; }
   document.getElementById('nav').innerHTML = TABS.map(function(t){
     return '<button class="'+(t.id===TAB?'on':'')+'" onclick="go(\''+t.id+'\')"><span class="ic">'+t.ic+'</span>'+t.name+'</button>';
@@ -989,6 +1031,7 @@ function openSettings(){
     '<div class="btns"><button class="btn sub sm" onclick="saveMembers()">구성원 저장</button></div></div>'+
     '<div class="card"><h2>데이터</h2><div class="btns" style="margin-top:0"><button class="btn sub" onclick="exportData()">내보내기 (JSON)</button><button class="btn sub" onclick="document.getElementById(\'file\').click()">가져오기</button></div>'+
     '<div class="tiny" style="margin-top:8px">가져오기는 지금 장부를 파일 내용으로 바꿉니다</div></div>'+
+    '<div class="card"><h2>지출 분류</h2><div class="btns" style="margin-top:0"><button class="btn sub" onclick="openCatMgr()">지출 분류 관리</button></div></div>'+
     '<div class="card"><h2>화면</h2><div class="btns" style="margin-top:0"><button class="btn sub" onclick="setTheme(\''+(dark?'light':'dark')+'\')">'+(dark?'라이트 테마':'다크 테마')+'</button></div></div>'+
     '<div class="btns"><button class="btn sub" onclick="closeModal()">닫기</button></div>');
 }
@@ -1620,6 +1663,7 @@ function viewExpenses(){
     return '<div class="hb" onclick="openExpCat(\''+o.c+'\')"><span class="hl">'+EXP_CATS[o.c]+'</span><span class="ht"><i style="width:'+(o.v/bmax*100)+'%;background:'+EXP_COLOR[o.c]+'"></i></span><span class="hv num">'+fm(o.v)+(HIDE?'':' <small>'+Math.round(o.v/total*100)+'%</small>')+'</span></div>'; }).join('')+'</div>';
   // 큰 항목(분류)만 보여 주고, 누르면 세부 항목을 보고 고침
   Object.keys(EXP_CATS).forEach(function(c){
+    if(catHidden(c)) return;
     var list = S.expenses.filter(function(x){ return x.cat === c; });
     var act = list.filter(function(x){ return expActive(x, now); });
     var amt = sum(act, function(x){ return num(x.monthly); });
@@ -1633,6 +1677,7 @@ function viewExpenses(){
     h += '</div><div class="card R"><h2>시기별 예상 월 고정지출</h2><table><tr><th>시기</th><th>금액</th></tr>'+pts.map(function(i){ return '<tr><td style="white-space:normal">'+ymDot(idxYm(i))+(agesAt(i)?'<div class="tiny">'+agesAt(i).replace(/^ · /,'')+'</div>':'')+'</td><td>'+fm(expenseAt(i))+'</td></tr>'; }).join('')+'</table>'+
       '<div class="tiny" style="margin-top:6px">저축 분류는 합계에서 빠집니다. 이 목록으로 은퇴 후 생활비를 계산하려면 시뮬 탭에서 \'고정지출 목록\'을 고르세요'+(S.sim.spendMode==='expenses'?' (사용 중)':'')+'</div>';
   }
+  h += '<div class="btns"><button class="btn sub sm" onclick="openCatMgr()">분류 관리</button></div>';
   return h + '</div>';
 }
 // 분류 시트: 세부 항목 목록 + 추가
@@ -1651,7 +1696,7 @@ function editExpense(id, cat){
   var x = S.expenses.find(function(e){ return e.id === id; }) || {cat:cat || 'living'};
   openModal('<h3>'+(id?'고정지출 수정':'고정지출 추가')+'</h3>'+
     '<label class="f">이름<input id="f_name" value="'+esc(x.name)+'" placeholder="예: 재준 수학 학원"></label>'+
-    '<div class="grid2"><label class="f">분류<select id="f_cat">'+Object.keys(EXP_CATS).map(function(c){ return '<option value="'+c+'" '+(c===x.cat?'selected':'')+'>'+EXP_CATS[c]+'</option>'; }).join('')+'</select></label>'+
+    '<div class="grid2"><label class="f">분류<select id="f_cat">'+Object.keys(EXP_CATS).filter(function(c){ return !catHidden(c) || c === x.cat; }).map(function(c){ return '<option value="'+c+'" '+(c===x.cat?'selected':'')+'>'+EXP_CATS[c]+'</option>'; }).join('')+'</select></label>'+
     '<label class="f">누구<select id="f_owner">'+ownerOptions(x.owner)+'</select></label></div>'+
     '<label class="f">월 금액 (만원 또는 원)<input id="f_monthly" inputmode="decimal" value="'+esc(x.monthly)+'"></label>'+
     '<div class="grid2"><label class="f">시작 (비우면 지금)<input id="f_start" type="month" value="'+esc(x.start)+'"></label>'+
