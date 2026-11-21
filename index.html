@@ -108,6 +108,9 @@ h2.ttl{font-size:19px;font-weight:800;color:var(--accent);padding-left:10px;bord
 .pcov{font-size:var(--f-xs);margin:-2px 0 8px;padding:6px 9px;border-radius:8px;background:var(--s2)}
 .pcov b{white-space:nowrap}
 a.btn{text-decoration:none;display:inline-flex;align-items:center;justify-content:center}
+.tlist{position:relative;margin-top:8px;max-height:44vh;overflow-y:auto;overscroll-behavior:contain;border-top:1px solid var(--bd);padding-top:4px}
+.tlist .row.tlhit{animation:tlhit 2.4s ease-out}
+@keyframes tlhit{0%,40%{background:rgba(232,160,32,.28)}100%{background:transparent}}
 .pchip.gapc{background:transparent;border:1px solid var(--warn);color:var(--warn);cursor:default}
 .rrow{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:var(--f-sm);color:var(--t2);margin:-2px 0 10px}
 .rrow input{width:76px;padding:6px 8px;border-radius:8px;border:1px solid var(--bd);background:var(--s2);color:var(--t1);font-size:var(--f-md);text-align:right}
@@ -1886,6 +1889,15 @@ function lumpExtras(allFuture){
   if(ps.length) h += '<div class="btns"><button class="btn sub sm" onclick="SHOW_PAST=!SHOW_PAST;render()">'+(SHOW_PAST ? '지난·완료 목돈 접기' : '지난·완료 목돈 '+ps.length+'건 보기')+'</button></div>'+(SHOW_PAST ? ps.map(lumpRow).join('') : '');
   return h;
 }
+// 타임라인 번호를 누르면 아래 목록에서 그 항목으로 스크롤하고 잠깐 강조 (수정 창은 열지 않음)
+function tlFocus(a, b){
+  var box = document.getElementById('tlist'), el = document.getElementById('tlr'+a); if(!box || !el) return;
+  [].forEach.call(box.querySelectorAll('.tlhit'), function(x){ x.classList.remove('tlhit'); });
+  for(var n = a; n <= b; n++){ var r = document.getElementById('tlr'+n); if(r){ void r.offsetWidth; r.classList.add('tlhit'); } }
+  box.scrollTo({top: Math.max(0, el.offsetTop - 4), behavior:'smooth'});
+  var rc = box.getBoundingClientRect();   // 목록 상자가 화면 밖이면 상자가 보이게
+  if(rc.top > window.innerHeight - 120 || rc.bottom < 80) box.scrollIntoView({behavior:'smooth', block:'nearest'});
+}
 function viewTimeline(){
   if(!S.family.some(function(f){ return f.birth && (f.rel === '본인' || f.rel === '배우자' || f.rel === '자녀'); }))
     return '<div class="card"><h2>생애 타임라인<span class="sp"></span><button class="btn sm" onclick="editLump()">+ 목돈</button></h2>'+lumpExtras(true)+'<div class="empty">\'가족 나이\'에 본인·배우자·자녀 생일을 넣으면 재직·연금·학업·군 복무가 연도 축에 그려집니다</div></div>';
@@ -1907,7 +1919,7 @@ function viewTimeline(){
     var row = gr.x - w/2 - lastX[0] >= 4 ? 0 : 1; lastX[row] = gr.x + w/2;
     var cy = row ? 33 : 11;
     g += '<line x1="'+gr.x+'" x2="'+gr.x+'" y1="'+(cy+9)+'" y2="'+(top+lanes.length*LH)+'" stroke="var(--warn)" stroke-width="0.7" stroke-dasharray="2 3" opacity=".7"/>'+
-      '<g style="cursor:pointer" onclick="'+gr.on+'"><rect x="'+(gr.x-w/2)+'" y="'+(cy-9)+'" width="'+w+'" height="18" rx="9" fill="var(--warn)"/><text x="'+gr.x+'" y="'+(cy+4)+'" font-size="11" text-anchor="middle" fill="#1a1205" font-weight="700">'+lab+'</text></g>';
+      '<g style="cursor:pointer" onclick="tlFocus('+gr.from+','+gr.to+')"><rect x="'+(gr.x-w/2)+'" y="'+(cy-9)+'" width="'+w+'" height="18" rx="9" fill="var(--warn)"/><text x="'+gr.x+'" y="'+(cy+4)+'" font-size="11" text-anchor="middle" fill="#1a1205" font-weight="700">'+lab+'</text></g>';
   });
   lanes.forEach(function(ln, li){
     var y = top + li*LH;
@@ -1922,11 +1934,11 @@ function viewTimeline(){
   var ay = top + lanes.length*LH + 4;
   g += '<line x1="'+L+'" x2="'+(W-R)+'" y1="'+ay+'" y2="'+ay+'" stroke="var(--bd)"/>';
   for(var yy = y0; yy <= y1; yy += 4) g += '<text x="'+X(yy*12)+'" y="'+(ay+16)+'" font-size="11" text-anchor="'+(yy===y0?'start':'middle')+'" fill="var(--t2)">\''+String(yy).slice(2)+'</text>';
-  var h = '<div class="card wide"><h2>생애 타임라인<span class="sp"></span><button class="btn sm" onclick="editLump()">+ 목돈</button></h2><div class="tiny" style="margin:-4px 0 4px">막대·목록을 눌러 수정</div>'+
+  var h = '<div class="card wide"><h2>생애 타임라인<span class="sp"></span><button class="btn sm" onclick="editLump()">+ 목돈</button></h2><div class="tiny" style="margin:-4px 0 4px">막대·목록을 누르면 수정 · 번호를 누르면 아래 목록에서 확인</div>'+
     '<svg viewBox="0 0 '+W+' '+Hh+'" width="100%">'+g+'</svg>'+
     '<div class="legend"><span><i style="background:var(--c5)"></i>재직</span><span><i style="background:var(--warn)"></i>공백</span><span><i style="background:var(--c1)"></i>연금</span><span><i style="background:var(--c3)"></i>학교</span><span><i style="background:var(--t2)"></i>군</span></div>';
-  if(marks.length) h += '<div style="margin-top:8px">'+marks.map(function(m, n){
-    return '<div class="row" onclick="'+m.on+'"><div style="width:22px;height:22px;border-radius:50%;background:var(--warn);color:#1a1205;font-weight:700;font-size:12px;display:flex;align-items:center;justify-content:center;flex:none">'+(n+1)+'</div>'+
+  if(marks.length) h += '<div class="tlist" id="tlist">'+marks.map(function(m, n){
+    return '<div class="row" id="tlr'+(n+1)+'" onclick="'+m.on+'"><div style="width:22px;height:22px;border-radius:50%;background:var(--warn);color:#1a1205;font-weight:700;font-size:12px;display:flex;align-items:center;justify-content:center;flex:none">'+(n+1)+'</div>'+
       '<div class="m"><div class="t">'+esc(m.t)+' <span class="tiny">('+ymDot(idxYm(m.i))+')</span></div></div>'+(m.amt!=null?'<div class="v '+(m.amt<0?'neg':'pos')+'">'+(m.amt>=0?'+':'')+fm(m.amt)+'</div>':'')+'</div>'; }).join('')+'</div>';
   h += lumpExtras();
   return h + '</div>';
