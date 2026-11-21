@@ -1532,18 +1532,23 @@ function openSalAuto(y, who){
     '<div class="tiny" style="margin:-4px 0 10px">명절휴가비·연가보상비 자동계산</div>'+
     '<div class="btns"><button class="btn" onclick="closeModal()">완료</button></div>');
 }
+function daysSelect(y, w, cur){
+  var v = num(cur), o = '<option value="">선택</option>';
+  for(var d = 0; d <= 20; d++) o += '<option value="'+d+'" '+(cur !== '' && cur != null && v === d ? 'selected' : '')+'>'+d+'일</option>';
+  return '<select style="width:90px;padding:4px 8px" onchange="setAuto('+y+',\''+w+'\',\'days\',this.value);openSalExtras('+y+',\''+w+'\')">'+o+'</select>';
+}
 function openSalExtras(y, who){
   var P = salOf(y, who), w = esc(who), on = autoOn(P);
   var list = P.extras.map(function(e){ return Object.assign({}, e, {off: on && AUTO_NAME.test(e.name)}); }).concat(autoExtras(y, P));
   openModal('<h3>'+w+' '+y+'년 기타 수당 등</h3>'+
     (list.length ? list.sort(function(a,b){ return num(a.month)-num(b.month); }).map(function(e){
       if(e.auto) return '<div class="row" style="cursor:default"><div class="m"><div class="t">'+esc(e.name)+'<span class="tag">자동계산</span></div><div class="tiny">'+e.month+'월 · '+esc(e.how)+'</div>'+
-        (/연가/.test(e.name) ? '<label class="tiny" style="display:flex;align-items:center;gap:6px;margin-top:4px">보상 일수 <input inputmode="decimal" style="width:70px;padding:4px 8px" value="'+esc((P.auto||{}).days||'')+'" onchange="setAuto('+y+',\''+w+'\',\'days\',this.value);openSalExtras('+y+',\''+w+'\')"> 일</label>' : '')+
+        (/연가/.test(e.name) ? '<label class="tiny" style="display:flex;align-items:center;gap:6px;margin-top:4px">보상 일수 '+daysSelect(y, w, (P.auto||{}).days)+'</label>' : '')+
         '</div><div class="v">'+fm(e.amount)+'</div></div>';
       return '<div class="row" onclick="editExtra('+y+',\''+w+'\',\''+e.id+'\')" style="'+(e.off?'opacity:.45':'')+'"><div class="m"><div class="t" style="'+(e.off?'text-decoration:line-through':'')+'">'+esc(e.name)+'</div><div class="tiny">'+(e.month?e.month+'월':'')+(e.off?' · 자동 계산으로 대체 (합계에서 뺌)':'')+'</div></div><div class="v">'+fm(Math.floor(num(e.amount)+1e-9))+'</div></div>'; }).join('')
       : '<div class="empty">성과상여금·연말정산 환급·초과근무수당 등</div>')+
     (on && !list.some(function(e){ return e.auto && /연가/.test(e.name); }) ? '<div class="row" style="cursor:default"><div class="m"><div class="t">연가보상비<span class="tag">자동계산</span></div>'+
-      '<label class="tiny" style="display:flex;align-items:center;gap:6px;margin-top:4px">보상 일수 <input inputmode="decimal" style="width:70px;padding:4px 8px" placeholder="예: 15" onchange="setAuto('+y+',\''+w+'\',\'days\',this.value);openSalExtras('+y+',\''+w+'\')"> 일</label></div><div class="v tiny">일수 입력</div></div>' : '')+
+      '<label class="tiny" style="display:flex;align-items:center;gap:6px;margin-top:4px">보상 일수 '+daysSelect(y, w, '')+'</label></div><div class="v tiny">일수 입력</div></div>' : '')+
     '<div class="btns"><button class="btn" onclick="editExtra('+y+',\''+w+'\')">+ 추가</button><button class="btn sub" onclick="closeModal()">닫기</button></div>');
 }
 function autoBox(y, who, P){
