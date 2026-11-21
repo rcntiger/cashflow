@@ -1409,7 +1409,7 @@ function periodIncomeCard(){
     });
   };
   var label = function(x){ var o = x.owner && x.owner !== '공동' ? nm(x.owner) : ''; var n = String(x.name).replace(/^(내|아내|본인|배우자)\s*/, ''); return (o ? o+' ' : '')+n; };
-  var h = '<div class="card"><h2>시기별 월 소득<span class="sp"></span><button class="btn sub sm" onclick="editExpense()">+ 지출</button><button class="btn sm" style="margin-left:6px" onclick="editIncome()">+ 소득</button></h2>';
+  var h = '<div class="card"><h2>예상 월 소득 및 지출<span class="sp"></span><button class="btn sub sm" onclick="editExpense()">+ 지출</button><button class="btn sm" style="margin-left:6px" onclick="editIncome()">+ 소득</button></h2>';
   if(!per.length) h += '<div class="empty">연금·급여·월세처럼 매달 들어오는 돈을 넣으세요</div>';
   // 강조 시기(은퇴·공로연수·연금·생활비 시작·고교 졸업) 사이는 한 줄로 묶고, 그 사이 작은 변화는 칩으로 요약
   var cats = Object.keys(EXP_CATS).filter(function(c){ return c !== 'saving'; });
