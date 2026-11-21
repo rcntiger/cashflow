@@ -108,7 +108,8 @@ h2.ttl{font-size:19px;font-weight:800;color:var(--accent);padding-left:10px;bord
 .pcov{font-size:var(--f-xs);margin:-2px 0 8px;padding:6px 9px;border-radius:8px;background:var(--s2)}
 .pcov b{white-space:nowrap}
 a.btn{text-decoration:none;display:inline-flex;align-items:center;justify-content:center}
-.tlgraph{position:sticky;top:var(--hdr,57px);z-index:5;background:var(--s1);margin:0 -14px;padding:2px 14px 8px;border-bottom:1px solid var(--bd)}
+.tlchips{position:sticky;top:var(--hdr,57px);z-index:6;background:var(--bg);margin:0 -12px!important;padding:8px 12px 12px}
+.tlgraph{position:sticky;top:calc(var(--hdr,57px) + var(--tlc,0px));z-index:5;background:var(--s1);margin:-14px -14px 0;padding:14px 14px 8px;border-radius:14px 14px 0 0;border-bottom:1px solid var(--bd)}
 .tlist{margin-top:6px}
 .tlist .row.tlhit{animation:tlhit 2.4s ease-out}
 @keyframes tlhit{0%,40%{background:rgba(232,160,32,.28)}100%{background:transparent}}
@@ -1600,7 +1601,7 @@ function viewMoney(){
 }
 // 가족 탭: 생애 타임라인 + 가족 나이
 function viewFam(){
-  var h = '<div class="chips">'+[['tl','타임라인'],['age','나이'],['ms','이정표']].map(function(c){ return '<button class="chip '+(FSUB===c[0]?'on':'')+'" onclick="setFsub(\''+c[0]+'\')">'+c[1]+'</button>'; }).join('')+'</div>';
+  var h = '<div class="chips'+(FSUB==='tl'?' tlchips':'')+'">'+[['tl','타임라인'],['age','나이'],['ms','이정표']].map(function(c){ return '<button class="chip '+(FSUB===c[0]?'on':'')+'" onclick="setFsub(\''+c[0]+'\')">'+c[1]+'</button>'; }).join('')+'</div>';
   return h + (FSUB === 'age' ? viewFamily() : FSUB === 'ms' ? milestoneCard() : viewTimeline());
 }
 function expActiveInc(x, i){ var s = ymIdx(x.start), e = incEnd(x); return (s == null || s <= i) && (e == null || i <= e); }
@@ -1896,11 +1897,15 @@ function tlFocus(a, b){
   [].forEach.call(box.querySelectorAll('.tlhit'), function(x){ x.classList.remove('tlhit'); });
   for(var n = a; n <= b; n++){ var r = document.getElementById('tlr'+n); if(r){ void r.offsetWidth; r.classList.add('tlhit'); } }
   setHdr();
-  var gr = document.querySelector('.tlgraph'), hd = document.querySelector('header');
-  var off = (hd ? hd.offsetHeight : 0) + (gr ? gr.offsetHeight : 0) + 6;   // 위에 고정된 머리글·그래프 아래로
+  var gr = document.querySelector('.tlgraph'), hd = document.querySelector('header'), ch = document.querySelector('.tlchips');
+  var off = (hd ? hd.offsetHeight : 0) + (ch ? ch.offsetHeight : 0) + (gr ? gr.offsetHeight : 0) + 6;   // 위에 고정된 머리글·그래프 아래로
   window.scrollTo({top: Math.max(0, window.scrollY + el.getBoundingClientRect().top - off), behavior:'smooth'});
 }
-function setHdr(){ var hd = document.querySelector('header'); if(hd) document.documentElement.style.setProperty('--hdr', hd.offsetHeight + 'px'); }
+function setHdr(){
+  var hd = document.querySelector('header'), ch = document.querySelector('.tlchips'), st = document.documentElement.style;
+  if(hd) st.setProperty('--hdr', hd.offsetHeight + 'px');
+  st.setProperty('--tlc', (ch ? ch.offsetHeight : 0) + 'px');
+}
 function viewTimeline(){
   if(!S.family.some(function(f){ return f.birth && (f.rel === '본인' || f.rel === '배우자' || f.rel === '자녀'); }))
     return '<div class="card"><h2>생애 타임라인<span class="sp"></span><button class="btn sm" onclick="editLump()">+ 목돈</button></h2>'+lumpExtras(true)+'<div class="empty">\'가족 나이\'에 본인·배우자·자녀 생일을 넣으면 재직·연금·학업·군 복무가 연도 축에 그려집니다</div></div>';
@@ -1937,8 +1942,8 @@ function viewTimeline(){
   var ay = top + lanes.length*LH + 4;
   g += '<line x1="'+L+'" x2="'+(W-R)+'" y1="'+ay+'" y2="'+ay+'" stroke="var(--bd)"/>';
   for(var yy = y0; yy <= y1; yy += 4) g += '<text x="'+X(yy*12)+'" y="'+(ay+16)+'" font-size="11" text-anchor="'+(yy===y0?'start':'middle')+'" fill="var(--t2)">\''+String(yy).slice(2)+'</text>';
-  var h = '<div class="card wide"><h2>생애 타임라인<span class="sp"></span><button class="btn sm" onclick="editLump()">+ 목돈</button></h2><div class="tiny" style="margin:-4px 0 4px">막대·목록을 누르면 수정 · 번호를 누르면 아래 목록에서 확인</div>'+
-    '<div class="tlgraph"><svg viewBox="0 0 '+W+' '+Hh+'" width="100%">'+g+'</svg>'+
+  var h = '<div class="card wide"><div class="tlgraph"><h2>생애 타임라인<span class="sp"></span><button class="btn sm" onclick="editLump()">+ 목돈</button></h2><div class="tiny" style="margin:-4px 0 4px">막대·목록을 누르면 수정 · 번호를 누르면 아래 목록에서 확인</div>'+
+    '<svg viewBox="0 0 '+W+' '+Hh+'" width="100%">'+g+'</svg>'+
     '<div class="legend"><span><i style="background:var(--c5)"></i>재직</span><span><i style="background:var(--warn)"></i>공백</span><span><i style="background:var(--c1)"></i>연금</span><span><i style="background:var(--c3)"></i>학교</span><span><i style="background:var(--t2)"></i>군</span></div>';
   h += '</div>';   // 그래프(위에 고정) 끝
   setTimeout(setHdr, 0);
