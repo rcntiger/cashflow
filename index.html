@@ -1578,7 +1578,6 @@ function openSalMonths(y, who){
 function openSalAuto(y, who){
   var P = salOf(y, who);
   openModal('<h3>'+esc(nm(who))+' '+y+'년 수당 설정</h3>'+autoBox(y, who, P)+
-    '<div class="tiny" style="margin:-4px 0 10px">명절휴가비·연가보상비 자동계산</div>'+
     '<div class="btns"><button class="btn" onclick="closeModal()">완료</button></div>');
 }
 function daysSelect(y, w, cur){
@@ -1608,7 +1607,6 @@ function autoBox(y, who, P){
       '</div>'+
     '<details style="margin-top:8px"><summary class="tiny" style="cursor:pointer">명절휴가비 지급 월 직접 바꾸기 (기본: 달력대로 '+c.seol+'월·'+c.chuseok+'월)</summary>'+
       '<div class="mgrid" style="margin-top:8px">'+f('설 지급 월', 'seol', a.seol, String(c.seol))+f('추석 지급 월', 'chuseok', a.chuseok, String(c.chuseok))+'</div></details>'+
-    '<div class="tiny" style="margin-top:8px">연가보상 일수는 \'기타 수당 등\'의 연가보상비 줄에서 넣습니다</div>'+
     '</div>';
 }
 function setAuto(y, who, k, v){
