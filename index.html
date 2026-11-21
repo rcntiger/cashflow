@@ -100,6 +100,13 @@ h2.ttl{font-size:19px;font-weight:800;color:var(--accent);padding-left:10px;bord
 .peq b{color:var(--t1);font-size:var(--f-md);font-variant-numeric:tabular-nums}
 .pnet{margin-left:auto;text-align:right}
 .pnet>div:first-child{font-size:24px;font-weight:800;font-variant-numeric:tabular-nums;line-height:1.1}
+.psum{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin:2px 0 12px}
+.psum>div{background:var(--s2);border-radius:10px;padding:8px 10px;min-width:0}
+.psum .l{font-size:var(--f-xs);color:var(--t2)}
+.psum .v{font-size:var(--f-md);font-weight:800;font-variant-numeric:tabular-nums;white-space:nowrap}
+.pdelta{font-size:var(--f-xs);color:var(--t2);margin:-4px 0 6px}
+.pcov{font-size:var(--f-xs);margin:-2px 0 8px;padding:6px 9px;border-radius:8px;background:var(--s2)}
+.pcov b{white-space:nowrap}
 .pchip.gapc{background:transparent;border:1px solid var(--warn);color:var(--warn);cursor:default}
 .rrow{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:var(--f-sm);color:var(--t2);margin:-2px 0 10px}
 .rrow input{width:76px;padding:6px 8px;border-radius:8px;border:1px solid var(--bd);background:var(--s2);color:var(--t1);font-size:var(--f-md);text-align:right}
@@ -423,7 +430,7 @@ function simulate(){
   var start = nowIdx(), end = num(sim.endYear)*12 + 11, life = ymIdx(sim.lifeStart) || start;
   var B = {reserve:0, gap:0, growth:0};
   S.assets.forEach(function(a){ if(FIN_CATS.indexOf(a.cat) < 0) return; var k = a.bucket === 'reserve' || a.bucket === 'gap' ? a.bucket : 'growth'; B[k] += num(a.value); });
-  var bal = B.reserve + B.gap + B.growth, start0 = bal, years = [], yNet = 0, minV = bal, minI = start, firstNeg = null;
+  var bal = B.reserve + B.gap + B.growth, start0 = bal, years = [], yNet = 0, minV = bal, minI = start, firstNeg = null, bals = {};
   for(var i = start; i <= end; i++){
     Object.keys(B).forEach(function(k){ if(B[k] > 0) B[k] *= (1 + mr[k]); });
     var inc = incomeAt(i);
@@ -431,12 +438,12 @@ function simulate(){
     net += lumpAt(i);
     if(net >= 0) B.growth += net;
     else { var need = -net; ['gap','reserve','growth'].forEach(function(k){ if(need <= 0) return; var take = k === 'growth' ? need : Math.min(Math.max(B[k], 0), need); B[k] -= take; need -= take; }); }
-    bal = B.reserve + B.gap + B.growth; yNet += net;
+    bal = B.reserve + B.gap + B.growth; yNet += net; bals[i] = bal;
     if(bal < minV){ minV = bal; minI = i; }
     if(bal < 0 && firstNeg == null) firstNeg = i;
     if(i % 12 === 11 || i === end){ years.push({y:Math.floor(i/12), bal:bal, net:yNet, b:{reserve:B.reserve, gap:B.gap, growth:B.growth}}); yNet = 0; }
   }
-  return {years:years, minV:minV, minI:minI, firstNeg:firstNeg, start:start0};
+  return {years:years, minV:minV, minI:minI, firstNeg:firstNeg, start:start0, bals:bals, from:start};
 }
 // 월 소득이 같은 구간끼리 묶기
 // 그 달의 월 생활비: 기본값(생활비 시작부터) → 기간별 생활비 중 시작월이 지난 마지막 구간
@@ -1495,9 +1502,18 @@ function periodIncomeCard(){
   });
   var h = '<div class="card"><h2>예상 월 소득 및 지출<span class="sp"></span><button class="btn sub sm" onclick="editExpense()">+ 지출</button><button class="btn sm" style="margin-left:6px" onclick="editIncome()">+ 소득</button></h2>';
   if(!groups.length) return h + '<div class="empty">연금·급여·월세처럼 매달 들어오는 돈을 넣으세요</div></div>';
+  // 맨 위 요약: 지금 월 잉여 · 첫 적자 · 누적 부족
+  var g0 = groups[0], firstBad = null, totNeg = 0;
+  per.forEach(function(q){ if(q.s == null) return; var n = q.v - q.s; if(n < 0){ if(firstBad == null) firstBad = q.from; totNeg += n * (Math.min(q.to, endAll) - q.from + 1); } });
+  h += '<div class="psum">'+
+    '<div><div class="l">지금 월 잉여</div><div class="v '+(g0.net != null && g0.net < 0 ? 'neg' : 'pos')+'">'+(g0.net != null ? sg(g0.net) : '–')+'</div></div>'+
+    '<div><div class="l">첫 적자</div><div class="v'+(firstBad != null ? ' neg' : '')+'">'+(firstBad != null ? yy(firstBad) : '없음')+'</div></div>'+
+    '<div><div class="l">누적 부족</div><div class="v'+(totNeg < 0 ? ' neg' : '')+'">'+(totNeg < 0 ? '−'+fm(Math.abs(totNeg)) : '0')+'</div></div></div>';
+  var simR = groups.some(function(g){ return g.min != null && g.min < 0; }) ? simulate() : null;
   // 비례 막대 (끝없는 마지막 구간은 5년 폭)
   h += '<div class="pbar">'+groups.map(function(g, k){ var w = g.open ? Math.min(g.months, 60) : g.months, bad = g.min != null && g.min < 0;
-    return '<div class="'+(bad?'bad':'ok')+'" style="flex:'+w+'" onclick="var e=document.getElementById(\'pg'+k+'\');if(e)e.scrollIntoView({behavior:\'smooth\',block:\'center\'})">'+(g.net != null && w >= 14 ? sg(g.net) : '')+'</div>'; }).join('')+'</div>'+
+    var tip = yy(g.a.from)+' ~ '+(g.open ? '계속' : yy(g.z.to))+(g.net != null ? ' · 월 '+(g.net < 0 ? '부족 ' : '잉여 ')+sg(g.net) : '');
+    return '<div class="'+(bad?'bad':'ok')+'" title="'+esc(tip)+'" style="flex:'+w+'" onclick="var e=document.getElementById(\'pg'+k+'\');if(e)e.scrollIntoView({behavior:\'smooth\',block:\'center\'})">'+(g.net != null && w >= 14 ? sg(g.net) : '')+'</div>'; }).join('')+'</div>'+
     '<div class="pax">'+groups.map(function(g){ return '<span>\''+idxYm(g.a.from).slice(2,4)+(g.open?'~':'')+'</span>'; }).join('')+'</div>';
   groups.forEach(function(g, k){
     var p = g.a, z = g.z, i = p.from, bad = g.min != null && g.min < 0;
@@ -1508,6 +1524,20 @@ function periodIncomeCard(){
       '<div class="peq">소득 <b>'+nmv(p.v)+arrow(p.v, z.v)+'</b> − 지출 <b>'+(p.s != null ? nmv(p.s)+arrow(p.s, z.s) : '–')+'</b>'+
       (g.net != null ? '<div class="pnet"><div class="'+(g.net<0?'neg':'pos')+'">'+sg(g.net)+'</div><div class="tiny">'+(g.net<0?'월 부족':'월 잉여')+
         (bad ? ' · 누적 −'+fm(Math.abs(g.cum)) : (g.max != null && g.max > g.net + 0.5 ? ' · 최대 '+sg(g.max) : ''))+'</div></div>' : '')+'</div>';
+    // 직전 구간 대비 잉여 변화와 원인
+    var pv = k ? groups[k-1].z : null;
+    if(pv && pv.s != null && p.s != null && !HIDE){
+      var dN = (p.v - p.s) - (pv.v - pv.s), dI = p.v - pv.v, dS = p.s - pv.s, why = [];
+      if(Math.abs(dI) >= 0.5) why.push('소득 '+sg(dI));
+      if(Math.abs(dS) >= 0.5) why.push('지출 '+sg(dS));
+      if(Math.abs(dN) >= 0.5) h += '<div class="pdelta">직전 대비 <b class="'+(dN < 0 ? 'neg' : 'pos')+'">'+sg(dN)+'</b>'+(why.length ? ' ('+why.join(' · ')+')' : '')+'</div>';
+    }
+    // 적자 구간: 시뮬 금융자산으로 메울 수 있는지
+    if(bad && simR){
+      var endI = Math.min(z.to, endAll), b0 = p.from <= simR.from ? simR.start : simR.bals[p.from-1], b1 = simR.bals[endI];
+      if(b0 != null && b1 != null) h += '<div class="pcov">시뮬 금융자산 <b>'+fm(b0)+'</b> → 구간 끝 '+
+        (b1 >= 0 ? '<b class="pos">'+fm(b1)+' 남음 · 충당 가능</b>' : '<b class="neg">'+fm(Math.abs(b1))+' 부족</b>')+'</div>';
+    }
     // 칩: 사람 순서 고정 → 기타 → 지출
     var inc = activeInc(i), incZ = activeInc(z.from), chips = [];
     inc.filter(isMain).sort(function(a,b){ return ord(a) - ord(b); }).forEach(function(x){
