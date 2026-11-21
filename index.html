@@ -30,7 +30,8 @@
   --debt-bg:#FDEEF1;--debt-bd:#F4CAD3;
 }
 *{box-sizing:border-box;margin:0;padding:0}
-html{-webkit-text-size-adjust:100%}
+html{-webkit-text-size-adjust:100%;background:var(--bg)}
+#view{min-height:calc(100vh - 60px);background:var(--bg)}
 body{font-family:var(--sans);background:var(--bg);color:var(--t1);font-size:var(--f-md);line-height:1.45}
 button,input,select{font:inherit;color:inherit}
 .num{font-family:var(--mono)}
@@ -699,8 +700,10 @@ function dueDone(id, i){
 function go(t, fromPop){
   if(t === 'flow'){ t = 'money'; MSUB = 'flow'; }
   if(!fromPop && t !== TAB) history.pushState({tab:t}, '', '#'+t);
-  TAB = t; localStorage.setItem('cf_tab', t); render(); window.scrollTo(0,0);
+  TAB = t; localStorage.setItem('cf_tab', t); render(); window.scrollTo(0,0); repaint();
 }
+// 휴대폰 Chrome에서 탭을 바꾼 뒤 이전 화면 조각이 남는 현상 방지: 화면을 한 번 다시 그리게 함
+function repaint(){ var v = document.getElementById('view'); if(!v) return; v.style.transform = 'translateZ(0)'; requestAnimationFrame(function(){ v.style.transform = ''; }); }
 
 function viewDash(){
   var t = totals();
@@ -884,7 +887,7 @@ function simAssumeHtml(){
     simField('계산 종료 연도', 'endYear', 'number', '1')+
     '</div><div class="tiny">물가를 뺀 실질 기준 · 금융자산만 계산 (부동산 제외)<br>수익률은 예산 탭에서 목적별로 넣습니다 (비우면 물가상승률)<br>은퇴 전: 월 저축액 더함 · 은퇴 후: 월 소득 − 생활비<br>목돈은 해당 월 반영 · 모자라면 ② → ① → ③ 순서로 꺼내 씀</div><div class="btns"><button class="btn" onclick="closeModal()">닫기</button></div>';
 }
-function setSimSub(v){ SIMSUB = v; try{ localStorage.setItem('cf_simsub', v); }catch(e){} render(); window.scrollTo(0,0); }
+function setSimSub(v){ SIMSUB = v; try{ localStorage.setItem('cf_simsub', v); }catch(e){} render(); window.scrollTo(0,0); repaint(); }
 function simField(label, k, type, step){
   var v = S.sim[k];
   return '<label class="f">'+label+'<input type="'+(type==='month'?'month':'number')+'" '+(step?'step="'+step+'" ':'')+'inputmode="decimal" value="'+esc(v)+'" onchange="setSim(\''+k+'\', this.value, \''+type+'\')"></label>';
@@ -1461,7 +1464,7 @@ function salaryPart(mode){   // mode 'sav': 저축 여력 카드만
 }
 // 자금흐름 탭: 맨 위 이번 달 숫자 + 칩(수입·지출·흐름)
 var FSUB = localStorage.getItem('cf_fsub') || 'tl';   // 가족 탭 칩
-function setFsub(s){ FSUB = s; localStorage.setItem('cf_fsub', s); render(); window.scrollTo(0,0); }
+function setFsub(s){ FSUB = s; localStorage.setItem('cf_fsub', s); render(); window.scrollTo(0,0); repaint(); }
 function goFam(s){ FSUB = s; localStorage.setItem('cf_fsub', s); go('fam'); }
 function periodEvents(i){
   var ev = [];
@@ -1576,7 +1579,7 @@ function periodIncomeCard(){
   h += '<div class="tiny" style="margin-top:8px">단위 만원 · 구간 시작 기준(↗↘는 구간 안 변화) · 은퇴 전 지출은 월 고정지출 합계 · 칩을 누르면 수정 · 막대를 누르면 그 구간으로</div>';
   return h + '</div>';
 }
-function setMsub(s){ MSUB = s; localStorage.setItem('cf_msub', s); render(); window.scrollTo(0,0); }
+function setMsub(s){ MSUB = s; localStorage.setItem('cf_msub', s); render(); window.scrollTo(0,0); repaint(); }
 function goMoney(s){ MSUB = s; localStorage.setItem('cf_msub', s); go('money'); }
 function viewMoney(){
   var now = nowIdx(), mi = monthIncome(now), exp = expenseAt(now), dc = debtCostAt(now), cap = mi.v - exp - dc;
