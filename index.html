@@ -1436,27 +1436,16 @@ function periodIncomeCard(){
       if(before && later) chips.push('<span class="pchip gapc">'+esc(nm(k))+' 공백</span>');
     });
     h += '<div class="pl2">'+chips.join('')+'</div>';
-    if(p.pre){
-      var e0 = expBy(i), dc = debtCostAt(i);
-      h += '<div class="pl2">'+cats.filter(function(c){ return e0[c] > 0; }).sort(function(a,b){ return e0[b] - e0[a]; }).map(function(c){ return '<span class="pchip outc" onclick="openExpCat(\''+c+'\')">'+EXP_CATS[c]+'<b>'+nmv(e0[c])+'</b></span>'; }).join('')+
-        (dc ? '<span class="pchip outc">대출<b>'+nmv(dc)+'</b></span>' : '')+'</div>';
-    } else if(after){
-      h += '<div class="pl2"><span class="pchip outc" onclick="go(\'sim\')">생활비 가정 (시뮬)<b>'+nmv(p.s)+'</b></span></div>';
-    }
     // 구간 안의 작은 변화
     var ch = [];
     for(var k = 1; k < g.ps.length; k++){
       var a = g.ps[k-1].from, b = g.ps[k].from, when = yy(b);
-      if(g.ps[k].pre){ var ea = expBy(a), eb = expBy(b);
-        cats.forEach(function(c){ if(ea[c] !== eb[c]) ch.push(EXP_CATS[c]+(eb[c] ? ' '+nmv(ea[c])+'→'+nmv(eb[c]) : ' 끝')+' '+when); });
-        var da = debtCostAt(a), db = debtCostAt(b); if(da !== db) ch.push('대출'+(db ? ' '+nmv(da)+'→'+nmv(db) : ' 끝')+' '+when);
-      } else if(g.ps[k].s !== g.ps[k-1].s && g.ps[k].s != null && g.ps[k-1].s != null) ch.push('생활비 '+nmv(g.ps[k-1].s)+'→'+nmv(g.ps[k].s)+' '+when);
       if(g.ps[k].v !== g.ps[k-1].v) ch.push('소득 '+nmv(g.ps[k-1].v)+'→'+nmv(g.ps[k].v)+' '+when);
     }
     if(ch.length) h += '<div class="pchg">'+ch.map(function(t){ return '<span>'+esc(t)+'</span>'; }).join('')+'</div>';
     h += '</div>';
   });
-  h += '<div class="tiny" style="margin-top:8px">단위 만원 · 급여는 월 환산 · * 은퇴 전은 월 고정지출 합계(참고) · 칩을 누르면 수정</div>';
+  h += '<div class="tiny" style="margin-top:8px">단위 만원 · 급여는 월 환산 · * 은퇴 전은 월 고정지출 합계 · 칩을 누르면 수정</div>';
   return h + '</div>';
 }
 function setMsub(s){ MSUB = s; localStorage.setItem('cf_msub', s); render(); window.scrollTo(0,0); }
