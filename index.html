@@ -785,13 +785,9 @@ function viewAssets(){
     if(d.note) di.push(esc(d.note));
     h += '<div class="row" onclick="editDebt(\''+d.id+'\')"><div class="m"><div class="t">'+esc(d.name)+'</div>'+(di.length?'<div class="tiny">'+di.join(' · ')+'</div>':'')+'</div><div class="v neg">−'+fm(num(d.value))+'</div></div>';
   });
-  var own = {}; byOwner(S.assets).forEach(function(a){ var k = a.owner || '공동'; own[k] = (own[k] || 0) + num(a.value); });
-  var ownRows = Object.keys(own).sort(function(a,b){ return own[b]-own[a]; }).map(function(k){ var pct = t.assets ? own[k]/t.assets*100 : 0;
-    return '<div style="margin-top:10px"><div style="display:flex;font-size:var(--f-sm)"><span>'+esc(nm(k))+'</span><span class="sp" style="flex:1"></span><span class="num">'+fm(own[k])+' <span class="tiny">'+Math.round(pct)+'%</span></span></div>'+
-      '<div style="height:6px;background:var(--s3);border-radius:99px;margin-top:4px;overflow:hidden"><div style="height:100%;width:'+pct+'%;background:var(--accent)"></div></div></div>'; }).join('');
   h += '</div>';
   var sumCard = '<div class="card R"><div class="grid2"><div class="kv"><div class="k">총자산</div><div class="v">'+fm(t.assets)+'</div></div><div class="kv"><div class="k">순자산</div><div class="v">'+fm(t.net)+'</div></div></div>'+
-    (ownRows ? '<h2 style="margin-top:14px">명의별 자산</h2>'+ownRows : '')+'<div class="tiny" style="margin-top:10px">금액 단위는 만원입니다</div></div>';
+    '<div class="tiny" style="margin-top:10px">금액 단위는 만원입니다</div></div>';
   h = h.replace('<!--SUM-->', sumCard);
   return h;
 }
