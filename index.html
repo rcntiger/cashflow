@@ -258,6 +258,13 @@ function normalize(d){
   if(!Array.isArray(d.expenses)) d.expenses = [];
   if(!Array.isArray(d.family)) d.family = [];
   fixMemberKeys(d);
+  if(Array.isArray(d.expenses) && !d.catSplit){   // 관리비·통신, 용돈·식대 분리
+    d.expenses.forEach(function(x){
+      if(x.cat === 'house' && /통신|휴대폰|핸드폰|인터넷|요금제|TV/i.test(x.name || '')) x.cat = 'telecom';
+      if(x.cat === 'allowance' && /식대|식비|점심|밥/.test(x.name || '')) x.cat = 'meal';
+    });
+    d.catSplit = true;
+  }
   var mnames = (d.members || []).map(function(m){ return m.name; });
   d.incomes.forEach(function(x){ if(x.kind == null && /근로소득|급여|월급/.test(x.name || '') && mnames.indexOf(x.owner) >= 0) x.kind = 'salary'; });
   if(!Array.isArray(d.moves)) d.moves = [];
@@ -421,8 +428,8 @@ function spendAt(i){
   return v + debtCostAt(i);
 }
 // 고정지출 합계 (저축 분류 제외)
-var EXP_COLOR = {living:'var(--c0)', allowance:'var(--c2)', family:'var(--c1)', insurance:'var(--c3)', edu:'var(--c4)', house:'var(--c5)', tax:'var(--t2)', etc:'var(--t3, var(--t2))'};
-var EXP_CATS = {living:'생활비', insurance:'보험료', edu:'교육비', house:'관리비·통신', tax:'세금', allowance:'용돈·식대', family:'양가 지원', saving:'저축 (지출 아님)', etc:'기타'};
+var EXP_COLOR = {living:'var(--c0)', allowance:'var(--c2)', meal:'#f08c6c', family:'var(--c1)', insurance:'var(--c3)', edu:'var(--c4)', house:'var(--c5)', telecom:'#7c8cf0', tax:'var(--t2)', etc:'var(--t3, var(--t2))'};
+var EXP_CATS = {living:'생활비', insurance:'보험료', edu:'교육비', house:'관리비', telecom:'통신비', tax:'세금', allowance:'용돈', meal:'식대', family:'양가 지원', saving:'저축 (지출 아님)', etc:'기타'};
 function expEnd(x){ var l = linkEnd(x); return l != null ? l : ymIdx(x.end); }
 function expActive(x, i){ var s = ymIdx(x.start), e = expEnd(x); return (s == null || s <= i) && (e == null || i <= e); }
 function expenseAt(i){ return sum(S.expenses.filter(function(x){ return x.cat !== 'saving' && expActive(x, i); }), function(x){ return num(x.monthly); }); }
