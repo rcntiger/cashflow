@@ -61,7 +61,11 @@ nav button.on{color:var(--accent);font-weight:700}
 .row .m{flex:1;min-width:0}
 .row .t{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .row .v{font-family:var(--mono);text-align:right;white-space:nowrap}
-.g-fam .tlist .row .t .tiny,.g-fam .tlist ~ .row .t .tiny{font-size:inherit}   /* 가족 타임라인: 항목 뒤 (년.월)을 이름과 같은 크기로 */
+.rdy{margin:16px 2px 2px!important;font-weight:700;color:var(--accent)}.rdy:first-child{margin-top:4px!important}.rdy .tiny{font-weight:400}
+.rdr .t{white-space:normal}.rdm{font-family:var(--mono);color:var(--t2);margin-right:8px}
+.rdd{width:8px;height:8px;border-radius:50%;flex:none;margin:0 6px}
+.lnote{margin-top:12px;padding:9px 11px;border-radius:9px;background:var(--s2);font-size:var(--f-xs);color:var(--t2);cursor:pointer;display:flex;align-items:center;justify-content:space-between;gap:8px}
+.lnote b{color:var(--accent)}
 .grp{font-size:var(--f-sm);color:var(--t2);margin:14px 2px 2px;display:flex;justify-content:space-between}
 .grp:first-child{margin-top:0}
 .sec-h{display:flex;align-items:center;gap:10px;margin:20px 2px 10px}
@@ -795,7 +799,7 @@ function viewDash(){
     (dc0 ? '<tr><td>대출 이자·상환</td><td class="neg">−'+fm(dc0)+'</td></tr>' : '')+
     '<tr><th style="text-align:left">남는 돈</th><th class="'+(cap0<0?'neg':'pos')+'">'+fm(cap0)+'</th></tr></table>'+
     '<div class="btns"><button class="btn sub sm" onclick="go(\'money\')">수입지출 보기</button></div></div>';
-  h += '<div class="card pc R"><h2>다가오는 목돈<span class="sp"></span><button class="btn sub sm" onclick="goFam(\'tl\')">전체</button></h2>'+
+  h += '<div class="card pc R"><h2>다가오는 목돈<span class="sp"></span><button class="btn sub sm" onclick="goMoney(\'flow\')">전체</button></h2>'+
     (up.length ? up.map(function(o){ var a = num(o.l.amount); return '<div class="row" onclick="editLump(\''+o.l.id+'\')"><div class="m"><div class="t">'+esc(o.l.name)+'</div><div class="tiny">'+ymDot(idxYm(o.i))+'</div></div><div class="v '+(a<0?'neg':'pos')+'">'+(a>=0?'+':'')+fm(a)+'</div></div>'; }).join('') : '<div class="empty">예정된 목돈이 없습니다</div>')+'</div>';
   h += '<div class="card R"><h2>순자산 추이<span class="sp"></span><button class="btn sm '+(saved?'sub':'')+'" onclick="saveSnapshot()">'+(saved?'이번 달 다시 기록':'이번 달 기록')+'</button></h2>'+
     lineChart(pts, {zero:false, empty:'매달 한 번 [이번 달 기록]을 누르면 추이가 쌓입니다'})+
@@ -1543,7 +1547,7 @@ function salaryPart(mode){   // mode 'sav': 저축 여력 카드만
   return h;
 }
 // 자금흐름 탭: 맨 위 이번 달 숫자 + 칩(수입·지출·흐름)
-var FSUB = localStorage.getItem('cf_fsub') || 'tl';   // 가족 탭 칩
+var FSUB = localStorage.getItem('cf_fsub') || 'tl'; if(FSUB === 'ms') FSUB = 'tl';   // 이정표는 타임라인 로드맵에 합침   // 가족 탭 칩
 function setFsub(s){ FSUB = s; localStorage.setItem('cf_fsub', s); render(); window.scrollTo(0,0); repaint(); }
 function goFam(s){ FSUB = s; localStorage.setItem('cf_fsub', s); go('fam'); }
 function periodEvents(i){
@@ -1743,8 +1747,8 @@ function viewMoney(){
 }
 // 가족 탭: 생애 타임라인 + 가족 나이
 function viewFam(){
-  var h = '<div class="chips'+(FSUB==='tl'?' tlchips':'')+'">'+[['tl','타임라인'],['age','나이'],['ms','이정표']].map(function(c){ return '<button class="chip '+(FSUB===c[0]?'on':'')+'" onclick="setFsub(\''+c[0]+'\')">'+c[1]+'</button>'; }).join('')+'</div>';
-  return h + (FSUB === 'age' ? viewFamily() : FSUB === 'ms' ? milestoneCard() : viewTimeline());
+  var h = '<div class="chips'+(FSUB==='tl'?' tlchips':'')+'">'+[['tl','타임라인'],['age','나이']].map(function(c){ return '<button class="chip '+(FSUB===c[0]?'on':'')+'" onclick="setFsub(\''+c[0]+'\')">'+c[1]+'</button>'; }).join('')+'</div>';
+  return h + (FSUB === 'age' ? viewFamily() : viewTimeline());
 }
 function expActiveInc(x, i){ var s = ymIdx(x.start), e = incEnd(x); return (s == null || s <= i) && (e == null || i <= e); }
 function setSal(y, who, i, v){ var P = salOf(y, who); P.months[i] = String(v).trim() === '' ? null : manFloor(v); commit(); }
@@ -2098,16 +2102,74 @@ function viewTimeline(){
   var ay = top + lanes.length*LH + 4;
   g += '<line x1="'+L+'" x2="'+(W-R)+'" y1="'+ay+'" y2="'+ay+'" stroke="var(--bd)"/>';
   for(var yy = y0; yy <= y1; yy += 4) g += '<text x="'+X(yy*12)+'" y="'+(ay+16)+'" font-size="11" text-anchor="'+(yy===y0?'start':'middle')+'" fill="var(--t2)">\''+String(yy).slice(2)+'</text>';
-  var h = '<div class="card wide"><div class="tlgraph"><h2>생애 타임라인<span class="sp"></span><button class="btn sm" onclick="editLump()">+ 목돈</button></h2><div class="tiny" style="margin:-4px 0 4px">막대·목록을 누르면 수정 · 번호를 누르면 아래 목록에서 확인</div>'+
+  var h = familyStatusCard() + '<div class="card wide"><div class="tlgraph"><h2>생애 타임라인</h2><div class="tiny" style="margin:-4px 0 4px">막대·목록을 누르면 수정 · 번호를 누르면 아래 로드맵에서 확인</div>'+
     '<svg viewBox="0 0 '+W+' '+Hh+'" width="100%">'+g+'</svg>'+
     '<div class="legend"><span><i style="background:var(--c5)"></i>재직</span><span><i style="background:var(--warn)"></i>공백</span><span><i style="background:var(--c1)"></i>연금</span><span><i style="background:var(--c3)"></i>학교</span><span><i style="background:var(--t2)"></i>군</span></div>';
   h += '</div>';   // 그래프(위에 고정) 끝
   setTimeout(setHdr, 0);
-  if(marks.length) h += '<div class="tlist" id="tlist">'+marks.map(function(m, n){
-    return '<div class="row" id="tlr'+(n+1)+'" onclick="'+m.on+'"><div style="width:22px;height:22px;border-radius:50%;background:var(--warn);color:#1a1205;font-weight:700;font-size:12px;display:flex;align-items:center;justify-content:center;flex:none">'+(n+1)+'</div>'+
-      '<div class="m"><div class="t">'+esc(m.t)+' <span class="tiny">('+ymDot(idxYm(m.i))+')</span></div></div>'+(m.amt!=null?'<div class="v '+(m.amt<0?'neg':'pos')+'">'+(m.amt>=0?'+':'')+fm(m.amt)+'</div>':'')+'</div>'; }).join('')+'</div>';
-  h += lumpExtras();
+  h += familyRoadmap(marks);
   return h + '</div>';
+}
+// 남은 기간 글자: '3년 2개월 후'
+function remainTxt(i){ var d = i - nowIdx(); if(d <= 0) return '이번 달'; var y = Math.floor(d/12), m = d%12; return (y ? y+'년 ' : '')+(m ? m+'개월 ' : '')+'후'; }
+// 가족 현재 상태: 나이 · 지금 단계 · 다음 전환점까지 (금액 없음)
+function familyStatusCard(){
+  var now = nowIdx(), list = S.family.filter(function(f){ return f.birth && (f.rel === '본인' || f.rel === '배우자' || f.rel === '자녀'); });
+  if(!list.length) return '';
+  var h = '<div class="card"><h2>가족 현재 상태<span class="sp"></span><span class="tiny">누르면 일정 수정</span></h2>';
+  list.forEach(function(f){
+    var age = ageAt(f.birth, now), badge = '', sub = '', on = '';
+    if(f.rel === '본인' || f.rel === '배우자'){
+      var r = retireIdx(f), pi = pensionIncome(f), ps = pi ? ymIdx(pi.start) : null;
+      if(now <= r){ badge = '재직 중'; sub = ymDot(idxYm(r))+' 퇴직 예정 ('+remainTxt(r)+')'; on = 'tlWork(\''+f.id+'\')'; }
+      else if(ps != null && now < ps){ badge = '연금 대기'; sub = ymDot(idxYm(ps))+' 연금 개시 ('+remainTxt(ps)+')'; on = 'tlPension(\''+f.id+'\')'; }
+      else { badge = '연금 수령'; sub = ps != null ? ymDot(idxYm(ps))+'부터 수령 중' : '연금 개시 월 미입력'; on = 'tlPension(\''+f.id+'\')'; }
+    } else {
+      var c = childPlan(f); if(!c) return;
+      on = 'tlChild(\''+f.id+'\')';
+      var cur = c.stages.find(function(st){ return now >= st.a && now <= st.b; });
+      badge = cur ? ({'중':'중학생','고':'고등학생','대':'대학생','군':'군 복무'}[cur.k] || cur.k) : (c.mid != null && now < c.mid ? '초등·미취학' : '성인');
+      if(c.highEnd != null && now <= c.highEnd) sub = ymDot(idxYm(c.highEnd))+' 고교 졸업 ('+remainTxt(c.highEnd)+')';
+      else if(!c.noUni && c.grad != null && now <= c.grad) sub = ymDot(idxYm(c.grad))+' 대학 졸업 ('+remainTxt(c.grad)+')';
+      else if(c.army && now <= c.army.to) sub = ymDot(idxYm(c.army.to + 1))+' 전역 ('+remainTxt(c.army.to + 1)+')';
+      else sub = '학업 일정 끝';
+    }
+    h += '<div class="row" onclick="'+on+'"><div class="m"><div class="t"><b>'+esc(famName(f))+'</b><span class="tag">만 '+age+'세 · '+badge+'</span></div><div class="tiny">'+sub+'</div></div><div class="v tiny">›</div></div>';
+  });
+  return h + '</div>';
+}
+// 생애·세제 로드맵: 그래프 번호 항목 + 퇴직·연금 개시 + 나이 이정표를 연도별로 (금액은 자금흐름 → 생애흐름에서)
+function familyRoadmap(marks){
+  var now = nowIdx(), end = num(S.sim.endYear)*12 + 11, ev = [];
+  marks.forEach(function(m, n){
+    var tag = m.amt != null ? ['목돈', 'var(--warn)'] : /성년/.test(m.t) ? ['성년', 'var(--c5)'] : ['학업·군', 'var(--c3)'];
+    ev.push({i:m.i, t:m.t, num:n+1, on:m.on, tag:tag[0], c:tag[1], sub:[]});
+  });
+  S.family.forEach(function(f){
+    if(!f.birth || !(f.rel === '본인' || f.rel === '배우자')) return;
+    var r = retireIdx(f), pi = pensionIncome(f), ps = pi ? ymIdx(pi.start) : null, nm0 = famName(f);
+    if(r != null && r >= now && r <= end) ev.push({i:r, t:nm0+' 퇴직 (재직 마지막 달)', on:'tlWork(\''+f.id+'\')', tag:'퇴직', c:'var(--warn)', sub:[]});
+    if(ps != null && ps >= now && ps <= end) ev.push({i:ps, t:nm0+' 연금 개시', on:'tlPension(\''+f.id+'\')', tag:'연금', c:'var(--c1)', sub:[]});
+  });
+  familyMilestones().forEach(function(m){   // 같은 달 성년 항목이 있으면 그 줄 설명으로 붙임
+    var hit = /성년/.test(m.text) && ev.find(function(e){ return e.i === m.i && /성년/.test(e.t); });
+    if(hit) hit.sub.push(m.text.replace(/^.*? — /, ''));
+    else ev.push({i:m.i, html:m.text, tag:'이정표', c:'var(--c5)', sub:[]});
+  });
+  ev.sort(function(a,b){ return a.i - b.i || (a.num || 99) - (b.num || 99); });
+  var h = '<div class="tlist" id="tlist">';
+  if(!ev.length) h += '<div class="empty">앞으로 예정된 생애 일정이 없습니다</div>';
+  var lastY = null;
+  ev.forEach(function(e){
+    var y = Math.floor(e.i/12), mo = e.i%12 + 1;
+    if(y !== lastY){ lastY = y; h += '<div class="grp rdy"><span>'+y+'년</span><span class="tiny">'+esc(agesAt(y*12 + 11).replace(/^ · /, ''))+'</span></div>'; }
+    h += '<div class="row rdr"'+(e.num ? ' id="tlr'+e.num+'"' : '')+(e.on ? ' onclick="'+e.on+'"' : ' style="cursor:default"')+'>'+
+      (e.num ? '<div class="lfn">'+e.num+'</div>' : '<span class="rdd" style="background:'+e.c+'"></span>')+
+      '<div class="m"><div class="t"><span class="rdm">'+mo+'월</span>'+(e.html || esc(e.t))+'<span class="tag" style="color:'+e.c+'">'+e.tag+'</span></div>'+
+      (e.sub.length ? '<div class="tiny">'+e.sub.map(esc).join(' · ')+'</div>' : '')+'</div>'+(e.on ? '<div class="v tiny">›</div>' : '')+'</div>';
+  });
+  h += '</div><div class="lnote" onclick="goMoney(\'flow\')"><span>목돈 금액과 그때 월 수지·금융자산은 <b>자금흐름 → 생애흐름</b>에서 봅니다</span><b>이동 ›</b></div>';
+  return h;
 }
 // 달 입력 + −1년/−1개월/+1개월/+1년
 function monthField(id, label, val){
