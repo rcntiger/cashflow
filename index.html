@@ -116,6 +116,49 @@ a.btn{text-decoration:none;display:inline-flex;align-items:center;justify-conten
 .lfm{margin:4px 0 2px}.lfm .row{padding:6px 2px}.lfm .t{font-size:var(--f-sm)}.lfm .v{font-size:var(--f-sm)}
 .lfn{width:20px;height:20px;border-radius:50%;background:var(--warn);color:#1a1205;font-weight:700;font-size:11px;display:flex;align-items:center;justify-content:center;flex:none}
 .psec.tlhit{animation:tlhit 2.4s ease-out}
+/* 생애흐름 세로 원장 */
+.lfflt{margin:4px 0 10px!important}
+.spw{position:relative}
+.spi{display:flex;align-items:stretch}
+.sprail{width:30px;flex:none;display:flex;flex-direction:column;align-items:center}
+.sprail .rt{width:3px;height:18px;background:var(--rp)}
+.sprail .dot{width:13px;height:13px;border-radius:50%;flex:none;background:var(--dc);border:2px solid var(--s1);box-shadow:0 0 0 2px var(--dc)}
+.sprail .rb{width:3px;flex:1;min-height:14px;background:var(--rn)}
+.spc{flex:1;min-width:0;background:var(--s2);border:1px solid var(--bd);border-radius:13px;padding:11px 12px;margin:4px 0}
+.spc.bad{background:linear-gradient(180deg,rgba(232,85,85,.10),var(--s2) 70%);border-color:rgba(232,85,85,.5)}
+.spc.wn{border-color:rgba(232,160,32,.5)}
+.sptop{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:6px}
+.spym{font-family:var(--mono);font-weight:700;background:var(--s3);padding:1px 8px;border-radius:7px}
+.spage{font-size:var(--f-xs);color:var(--t2)}
+.sphead{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:4px}
+.sptag{font-size:11px;font-weight:700;padding:1px 7px;border-radius:99px;border:1px solid}
+.splump{font-family:var(--mono);font-size:var(--f-sm);font-weight:700;margin-left:auto}
+.spev{display:flex;align-items:center;gap:8px;padding:5px 2px;font-size:var(--f-sm)}
+.spev.clk{cursor:pointer}.spev .t{flex:1;min-width:0}.spev .v{font-family:var(--mono);white-space:nowrap}
+.spdot{width:8px;height:8px;border-radius:50%;flex:none;margin:0 6px}
+.speq{background:var(--s1);border-radius:10px;padding:8px 10px;margin:8px 0}
+.speq .l{display:flex;align-items:baseline;gap:6px;flex-wrap:wrap;font-size:var(--f-sm);color:var(--t2)}
+.speq .l b{color:var(--t1);font-family:var(--mono)}
+.speq .n{margin-left:auto;font-family:var(--mono);font-weight:800;font-size:var(--f-md)}
+.speq .pl2{margin-top:6px}
+.spstk{border-top:1px dashed var(--bd);padding-top:8px}
+.spstk .top{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:6px;font-size:var(--f-sm);color:var(--t2)}
+.spstk .top b{color:var(--t1);font-family:var(--mono)}
+.spstk .d{font-family:var(--mono);font-size:var(--f-xs);font-weight:700}
+.spst{margin-left:auto;font-size:11px;font-weight:700;padding:2px 8px;border-radius:99px;white-space:nowrap}
+.spst.ok{background:rgba(46,204,122,.14);color:var(--good)}.spst.sv{background:rgba(59,195,195,.14);color:var(--c5)}
+.spst.wn{background:rgba(232,160,32,.16);color:var(--warn)}.spst.bad{background:rgba(232,85,85,.16);color:var(--bad)}
+.bbar{display:flex;height:8px;border-radius:99px;overflow:hidden;background:var(--s3);gap:1.5px;margin-bottom:6px}
+.bbar i{display:block;height:100%}
+.bleg{display:flex;flex-wrap:wrap;gap:3px 12px;font-size:12px;color:var(--t2)}
+.bleg i{width:8px;height:8px;border-radius:2px;display:inline-block;margin-right:4px}
+.bleg b{font-family:var(--mono);color:var(--t1);font-weight:500}
+.spbr{display:flex;align-items:stretch}
+.spbr .sprail i{width:3px;flex:1;background:var(--rc)}
+.spbp{margin:4px 0 6px;padding:4px 11px;border-radius:99px;font-size:12px;background:var(--s2);border:1px solid var(--bd);color:var(--t2)}
+.spbp.save{border-color:rgba(59,195,195,.4)}.spbp.good{border-color:rgba(46,204,122,.4)}.spbp.bad{border-color:rgba(232,85,85,.55);background:rgba(232,85,85,.10);color:var(--t1)}
+.spbp b{font-family:var(--mono)}
+.spi.tlhit .spc,.spev.tlhit{animation:tlhit 2.4s ease-out}
 .tlist .row.tlhit{animation:tlhit 2.4s ease-out}
 @keyframes tlhit{0%,40%{background:rgba(232,160,32,.28)}100%{background:transparent}}
 .pchip.gapc{background:transparent;border:1px solid var(--warn);color:var(--warn);cursor:default}
@@ -446,7 +489,7 @@ function simulate(){
   var start = nowIdx(), end = num(sim.endYear)*12 + 11, life = ymIdx(sim.lifeStart) || start;
   var B = {reserve:0, gap:0, growth:0};
   S.assets.forEach(function(a){ if(FIN_CATS.indexOf(a.cat) < 0) return; var k = a.bucket === 'reserve' || a.bucket === 'gap' ? a.bucket : 'growth'; B[k] += num(a.value); });
-  var bal = B.reserve + B.gap + B.growth, start0 = bal, years = [], yNet = 0, minV = bal, minI = start, firstNeg = null, bals = {};
+  var bal = B.reserve + B.gap + B.growth, start0 = bal, years = [], yNet = 0, minV = bal, minI = start, firstNeg = null, bals = {}, bk = {}, B0 = {reserve:B.reserve, gap:B.gap, growth:B.growth};
   for(var i = start; i <= end; i++){
     Object.keys(B).forEach(function(k){ if(B[k] > 0) B[k] *= (1 + mr[k]); });
     var inc = incomeAt(i);
@@ -454,12 +497,12 @@ function simulate(){
     net += lumpAt(i);
     if(net >= 0) B.growth += net;
     else { var need = -net; ['gap','reserve','growth'].forEach(function(k){ if(need <= 0) return; var take = k === 'growth' ? need : Math.min(Math.max(B[k], 0), need); B[k] -= take; need -= take; }); }
-    bal = B.reserve + B.gap + B.growth; yNet += net; bals[i] = bal;
+    bal = B.reserve + B.gap + B.growth; yNet += net; bals[i] = bal; bk[i] = {reserve:B.reserve, gap:B.gap, growth:B.growth};
     if(bal < minV){ minV = bal; minI = i; }
     if(bal < 0 && firstNeg == null) firstNeg = i;
     if(i % 12 === 11 || i === end){ years.push({y:Math.floor(i/12), bal:bal, net:yNet, b:{reserve:B.reserve, gap:B.gap, growth:B.growth}}); yNet = 0; }
   }
-  return {years:years, minV:minV, minI:minI, firstNeg:firstNeg, start:start0, bals:bals, from:start};
+  return {years:years, minV:minV, minI:minI, firstNeg:firstNeg, start:start0, bals:bals, bk:bk, b0:B0, from:start};
 }
 // 월 소득이 같은 구간끼리 묶기
 // 그 달의 월 생활비: 기본값(생활비 시작부터) → 기간별 생활비 중 시작월이 지난 마지막 구간
@@ -1535,7 +1578,7 @@ function periodIncomeCard(){
     '<div><div class="l">지금 월 잉여</div><div class="v '+(g0.net != null && g0.net < 0 ? 'neg' : 'pos')+'">'+(g0.net != null ? sg(g0.net) : '–')+'</div></div>'+
     '<div><div class="l">첫 적자</div><div class="v'+(firstBad != null ? ' neg' : '')+'">'+(firstBad != null ? yy(firstBad) : '없음')+'</div></div>'+
     '<div><div class="l">누적 부족</div><div class="v'+(totNeg < 0 ? ' neg' : '')+'">'+(totNeg < 0 ? '−'+fm(Math.abs(totNeg)) : '0')+'</div></div></div>';
-  var simR = groups.some(function(g){ return g.min != null && g.min < 0; }) ? simulate() : null;
+  var simR = simulate();
   // 생애 그래프: 위에 가족 레인(재직·공백·연금·학교·군), 아래에 월 수지 막대 — 같은 시간축 X(i)
   var lanes = timelineLanes(), marks = timelineMarks();
   marks.forEach(function(m, n){ m.num = n + 1; var t = -1; groups.forEach(function(gg, gi){ if(m.i >= gg.a.from && m.i <= gg.z.to) t = gi; }); if(t < 0) t = groups.length - 1; groups[t].marks.push(m); });
@@ -1582,50 +1625,70 @@ function periodIncomeCard(){
   h += '<div class="lfgraph"><svg viewBox="0 0 '+W+' '+Hh+'" width="100%">'+sv+'</svg>'+
     '<div class="legend">'+(lanes.length ? '<span><i style="background:var(--c5)"></i>재직</span><span><i style="background:var(--warn)"></i>공백</span><span><i style="background:var(--c1)"></i>연금·흑자</span><span><i style="background:var(--c3)"></i>학교</span><span><i style="background:var(--t2)"></i>군</span>' : '<span><i style="background:var(--c1)"></i>흑자</span>')+'<span><i style="background:#e05252"></i>적자</span></div></div>';
   setTimeout(setHdr, 0);
-  groups.forEach(function(g, k){
-    var p = g.a, z = g.z, i = p.from, bad = g.min != null && g.min < 0;
-    var dur = g.open ? '계속' : (Math.floor(g.months/12) ? Math.floor(g.months/12)+'년' : '')+(g.months%12 ? ' '+(g.months%12)+'개월' : '');
-    h += '<div class="psec'+(bad?' bad':'')+'" id="pg'+k+'">'+
-      (g.ev.length ? '<div class="pevh">▸ '+yy(p.from)+' '+g.ev.map(esc).join(' · ')+(bad?' · 소득 공백기':'')+'</div>' : '')+
-      '<div class="pdur">'+yy(p.from)+' ~ '+(g.open ? '계속' : yy(z.to)+' · '+dur)+'</div>'+
-      '<div class="peq">소득 <b>'+nmv(p.v)+arrow(p.v, z.v)+'</b> − 지출 <b>'+(p.s != null ? nmv(p.s)+arrow(p.s, z.s) : '–')+'</b>'+
-      (g.net != null ? '<div class="pnet"><div class="'+(g.net<0?'neg':'pos')+'">'+sg(g.net)+'</div><div class="tiny">'+(g.net<0?'월 부족':'월 잉여')+
-        (bad ? ' · 누적 −'+fm(Math.abs(g.cum)) : (g.max != null && g.max > g.net + 0.5 ? ' · 최대 '+sg(g.max) : ''))+'</div></div>' : '')+'</div>';
-    // 직전 구간 대비 잉여 변화와 원인
-    var pv = k ? groups[k-1].z : null;
-    if(pv && pv.s != null && p.s != null && !HIDE){
-      var dN = (p.v - p.s) - (pv.v - pv.s), dI = p.v - pv.v, dS = p.s - pv.s, why = [];
-      if(Math.abs(dI) >= 0.5) why.push('소득 '+sg(dI));
-      if(Math.abs(dS) >= 0.5) why.push('지출 '+sg(dS));
-      if(Math.abs(dN) >= 0.5) h += '<div class="pdelta">직전 대비 <b class="'+(dN < 0 ? 'neg' : 'pos')+'">'+sg(dN)+'</b>'+(why.length ? ' ('+why.join(' · ')+')' : '')+'</div>';
-    }
-    // 적자 구간: 시뮬 금융자산으로 메울 수 있는지
-    if(bad && simR){
-      var endI = Math.min(z.to, endAll), b0 = p.from <= simR.from ? simR.start : simR.bals[p.from-1], b1 = simR.bals[endI];
-      if(b0 != null && b1 != null) h += '<div class="pcov">시뮬 금융자산 <b>'+fm(b0)+'</b> → 구간 끝 '+
-        (b1 >= 0 ? '<b class="pos">'+fm(b1)+' 남음 · 충당 가능</b>' : '<b class="neg">'+fm(Math.abs(b1))+' 부족</b>')+'</div>';
-    }
-    // 이 구간에 있는 목돈·가족 일정 (번호는 위 그래프와 같음, 누르면 수정)
-    if(g.marks.length) h += '<div class="lfm">'+g.marks.map(function(m){
-      return '<div class="row" id="lfr'+m.num+'" onclick="'+m.on+'"><div class="lfn">'+m.num+'</div><div class="m"><div class="t">'+esc(m.t)+' <span class="tiny">('+ymDot(idxYm(m.i))+')</span></div></div>'+
-        (m.amt != null ? '<div class="v '+(m.amt<0?'neg':'pos')+'">'+(m.amt>=0?'+':'')+fm(m.amt)+'</div>' : '')+'</div>'; }).join('')+'</div>';
+  // ── 세로 원장: 일이 생기는 달마다 노드, 노드 사이는 구간 띠 ──
+  var perAt = function(i){ for(var q = 0; q < per.length; q++) if(i >= per[q].from && i <= per[q].to) return per[q]; return per[per.length-1]; };
+  var netAt = function(i){ var q = perAt(i); return q.s != null ? q.v - q.s : 0; };
+  var chipsAt = function(i){
+    var pp = perAt(i);
     // 칩: 사람 순서 고정 → 기타 → 지출
-    var inc = activeInc(i), incZ = activeInc(z.from), chips = [];
+    var inc = activeInc(i), incZ = inc, chips = [];
     inc.filter(isMain).sort(function(a,b){ return ord(a) - ord(b); }).forEach(function(x){
-      var v0 = incomeItemAt(x, i, true), v1 = incZ.indexOf(x) >= 0 ? incomeItemAt(x, z.from, true) : v0;
+      var v0 = incomeItemAt(x, i, true), v1 = incZ.indexOf(x) >= 0 ? incomeItemAt(x, i, true) : v0;
       chips.push('<span class="pchip" onclick="editIncome(\''+x.id+'\')">'+esc(label(x))+' <b>'+nmv(v0)+arrow(v0, v1)+'</b></span>'); });
     (S.members || []).forEach(function(m){
       var key = m.name, mine = S.incomes.filter(function(x){ return x.owner === key; });
       if(!mine.length || inc.some(function(x){ return x.owner === key; })) return;
-      var before = mine.some(function(x){ var e = incEnd(x); return e != null && e < i; }), later = mine.some(function(x){ var s = ymIdx(x.start); return s != null && s > z.to; });
+      var before = mine.some(function(x){ var e = incEnd(x); return e != null && e < i; }), later = mine.some(function(x){ var s = ymIdx(x.start); return s != null && s > i; });
       if(before && later) chips.push('<span class="pchip gapc">'+esc(nm(key))+' 공백 0</span>');
     });
     var etc = inc.filter(function(x){ return !isMain(x); });
     if(etc.length) chips.push('<span class="pchip" onclick="editIncome(\''+etc[0].id+'\')">기타 <b>'+nmv(sum(etc, function(x){ return incomeItemAt(x, i, true); }))+'</b></span>');
-    if(p.s != null) chips.push(p.pre ? '<span class="pchip outc" onclick="setMsub(\'out\')">고정지출 <b>'+nmv(p.s)+arrow(p.s, z.s)+'</b></span>'
-                                     : '<span class="pchip outc" onclick="go(\'sim\')">생활비 <b>'+nmv(p.s)+arrow(p.s, z.s)+'</b></span>');
-    h += '<div class="pl2">'+chips.join('')+'</div></div>';
+    if(pp.s != null) chips.push(pp.pre ? '<span class="pchip outc" onclick="setMsub(\'out\')">고정지출 <b>'+nmv(pp.s)+'</b></span>'
+                                     : '<span class="pchip outc" onclick="go(\'sim\')">생활비 <b>'+nmv(pp.s)+'</b></span>');
+    return chips.join('');
+  };
+  var ageTxt = function(i){ return S.family.filter(function(f){ return f.birth && (f.rel === '본인' || f.rel === '배우자' || f.rel === '자녀'); }).map(function(f){ var b = f.birth.split('-').map(Number), y = Math.floor(i/12), m = i%12 + 1; return esc(famName(f))+' '+(y - b[0] - (m < b[1] ? 1 : 0)); }).join(' · '); };
+  var nodes = {}, addN = function(i, it){ if(i == null || i < nowIdx() || i > endAll) return; (nodes[i] = nodes[i] || {i:i, items:[]}).items.push(it); };
+  addN(nowIdx(), {t:'지금', c:'var(--c5)', cat:'기준'});
+  groups.forEach(function(g, k){ g.ev.forEach(function(t){ addN(g.a.from, {t:t, c:/연금/.test(t) ? 'var(--c1)' : /은퇴|퇴직|공백/.test(t) ? 'var(--warn)' : 'var(--accent)', cat:/연금/.test(t) ? '연금' : /은퇴|퇴직/.test(t) ? '퇴직' : '변화', pivot:true}); }); if(nodes[g.a.from]) nodes[g.a.from].pg = k; });
+  marks.forEach(function(m){ addN(Math.min(m.i, endAll), {t:m.t, num:m.num, amt:m.amt, on:m.on, c:m.amt != null ? (m.amt < 0 ? 'var(--bad)' : 'var(--good)') : 'var(--c3)', cat:m.amt != null ? (m.amt < 0 ? '목돈 지출' : '목돈 수입') : '가족', mark:true}); });
+  addN(endAll, {t:num(S.sim.endYear)+'년 말 정산', c:'var(--c0)', cat:'끝', pivot:true});
+  var list = Object.keys(nodes).map(Number).sort(function(a,b){ return a - b; }).map(function(i){ return nodes[i]; });
+  list.forEach(function(n){ n.net = netAt(n.i); n.lump = sum(n.items.filter(function(x){ return x.amt != null; }), function(x){ return x.amt; });
+    n.pivot = n.items.some(function(x){ return x.pivot; }) || n.net < 0 || Math.abs(n.lump) >= 5000; n.isMark = n.items.some(function(x){ return x.mark; }); });
+  if(LF_FILTER !== 'all') list = list.filter(function(n, k){ return k === 0 || k === list.length - 1 || n.pg != null || (LF_FILTER === 'pivot' ? n.pivot : n.isMark); });
+  // 그래프 번호가 필터로 숨으면 '전체'로 돌아가 찾게
+  h += '<div class="chips lfflt">'+[['all','전체'],['pivot','변곡점·적자'],['mark','목돈·일정']].map(function(c){ return '<button class="chip '+(LF_FILTER===c[0]?'on':'')+'" onclick="LF_FILTER=\''+c[0]+'\';render()">'+c[1]+'</button>'; }).join('')+'</div>';
+  var rc = function(st){ return st === 'save' ? 'var(--c5)' : st === 'bad' ? 'var(--bad)' : st === 'warn' ? 'var(--warn)' : 'var(--good)'; };
+  list.forEach(function(n, k){
+    var nx = list[k+1];
+    if(nx){ var sN = 0, mn = Infinity; for(var m = n.i; m < nx.i; m++){ var v = netAt(m); sN += v; if(v < mn) mn = v; }
+      var cnt = Math.max(1, nx.i - n.i), pre = perAt(n.i).pre; n.br = {months:cnt, avg:sN/cnt, sum:sN, st:pre ? 'save' : mn < 0 ? 'bad' : 'good', to:nx.i - 1}; }
   });
+  h += '<div class="spw">';
+  list.forEach(function(n, k){
+    var pv = k ? list[k-1].br : null, st = n.br ? n.br.st : pv ? pv.st : 'good', pp = perAt(n.i), bad = n.net < 0;
+    var b = simR.bk[n.i] || simR.b0, tot = b.reserve + b.gap + b.growth, prevB = k ? (simR.bk[list[k-1].i] || simR.b0) : simR.b0, prevT = prevB.reserve + prevB.gap + prevB.growth;
+    var pos = function(v){ return Math.max(0, v); }, bs = pos(b.reserve) + pos(b.gap) + pos(b.growth) || 1;
+    var pill = tot < 0 ? '<span class="spst bad">금융자산 소진</span>' : pp.pre ? '<span class="spst sv">저축 적립 중</span>' : bad ? (b.gap > 0 ? '<span class="spst wn">② 공백 대비로 충당</span>' : '<span class="spst bad">③ 장기투자에서 인출</span>') : '<span class="spst ok">흑자 · ③에 적립</span>';
+    var tags = n.items.filter(function(x, q, a){ return a.findIndex(function(y){ return y.cat === x.cat; }) === q; }).map(function(x){ return '<span class="sptag" style="color:'+x.c+';border-color:'+x.c+'">'+esc(x.cat)+'</span>'; }).join('');
+    h += '<div class="spi" id="'+(n.pg != null ? 'pg'+n.pg : 'spn'+n.i)+'" style="--rp:'+(pv ? rc(pv.st) : 'transparent')+';--rn:'+(n.br ? rc(n.br.st) : 'transparent')+';--dc:'+rc(st)+'">'+
+      '<div class="sprail"><i class="rt"></i><i class="dot"></i><i class="rb"></i></div>'+
+      '<div class="spc'+(bad ? ' bad' : n.br && n.br.st === 'bad' ? ' wn' : '')+'">'+
+        '<div class="sptop"><span class="spym">'+ymDot(idxYm(n.i))+'</span><span class="spage">'+ageTxt(n.i)+'</span></div>'+
+        '<div class="sphead">'+tags+(n.items.filter(function(x){ return x.amt != null; }).length > 1 ? '<span class="splump '+(n.lump<0?'neg':'pos')+'">'+(n.lump>0?'+':'−')+fm(Math.abs(n.lump))+'</span>' : '')+'</div>'+
+        n.items.map(function(x){ return '<div class="spev'+(x.on ? ' clk' : '')+'"'+(x.num ? ' id="lfr'+x.num+'"' : '')+(x.on ? ' onclick="'+x.on+'"' : '')+'>'+(x.num ? '<span class="lfn">'+x.num+'</span>' : '<span class="spdot" style="background:'+x.c+'"></span>')+'<span class="t">'+esc(x.t)+'</span>'+(x.amt != null ? '<span class="v '+(x.amt<0?'neg':'pos')+'">'+(x.amt>=0?'+':'−')+fm(Math.abs(x.amt))+'</span>' : '')+'</div>'; }).join('')+
+        '<div class="speq"><div class="l">소득 <b>'+nmv(pp.v)+'</b> − 지출 <b>'+(pp.s != null ? nmv(pp.s) : '–')+'</b><span class="n '+(bad?'neg':'pos')+'">월 '+sg(n.net)+'</span></div><div class="pl2">'+chipsAt(n.i)+'</div></div>'+
+        '<div class="spstk"><div class="top"><span>예상 금융자산 <b>'+fm(tot)+'</b></span>'+(k ? '<span class="d '+(tot>=prevT?'pos':'neg')+'">'+(tot>=prevT?'▲ ':'▼ ')+fm(Math.abs(tot-prevT))+'</span>' : '')+pill+'</div>'+
+          '<div class="bbar"><i style="width:'+(pos(b.reserve)/bs*100)+'%;background:var(--c5)"></i><i style="width:'+(pos(b.gap)/bs*100)+'%;background:var(--c2)"></i><i style="width:'+(pos(b.growth)/bs*100)+'%;background:var(--c0)"></i></div>'+
+          '<div class="bleg"><span><i style="background:var(--c5)"></i>① 예비 <b>'+fm(b.reserve)+'</b></span><span><i style="background:var(--c2)"></i>② 공백 <b>'+fm(b.gap)+'</b></span><span><i style="background:var(--c0)"></i>③ 장기 <b>'+fm(b.growth)+'</b></span></div></div>'+
+      '</div></div>';
+    if(n.br){ var br = n.br;
+      h += '<div class="spbr" style="--rc:'+rc(br.st)+'"><div class="sprail"><i></i></div><div class="spbp '+br.st+'"><span class="num">'+ymDot(idxYm(n.i))+' ~ '+ymDot(idxYm(br.to))+' ('+br.months+'개월)</span> · '+
+        (br.st === 'save' ? '은퇴 전 · 월 저축 '+fm(num(S.sim.saveBefore)) : br.avg >= 0 ? '월 평균 <b class="pos">'+sg(br.avg)+'</b> · 누적 <b class="pos">+'+fm(br.sum)+'</b>' : '월 평균 <b class="neg">'+sg(br.avg)+'</b> · 누적 <b class="neg">−'+fm(Math.abs(br.sum))+'</b>')+'</div></div>';
+    }
+  });
+  h += '</div>';
   h += lumpExtras();
   h += '<div class="tiny" style="margin-top:8px">단위 만원 · 구간 시작 기준(↗↘는 구간 안 변화) · 은퇴 전 지출은 월 고정지출 합계 · 가족 막대·칩·목록을 누르면 수정 · 번호·수지 막대를 누르면 아래 구간으로</div>';
   return h + '</div>';
@@ -1947,10 +2010,13 @@ function tlFocus(a, b){
   var off = (hd ? hd.offsetHeight : 0) + (ch ? ch.offsetHeight : 0) + (gr ? gr.offsetHeight : 0) + 6;   // 위에 고정된 머리글·그래프 아래로
   window.scrollTo({top: Math.max(0, window.scrollY + el.getBoundingClientRect().top - off), behavior:'smooth'});
 }
-var FLOW_FULL = false;   // 생애흐름: false 22년 / true 시뮬 끝 연도까지
+var FLOW_FULL = false;
+var LF_FILTER = 'all';   // 생애흐름 원장: all 전체 / pivot 변곡점·적자 / mark 목돈·일정   // 생애흐름: false 22년 / true 시뮬 끝 연도까지
 // 생애흐름: 번호·수지 막대를 누르면 아래 해당 줄·구간으로 스크롤하고 강조
 function lfFocus(pre, a, b){
-  var el = document.getElementById(pre + a); if(!el) return;
+  var el = document.getElementById(pre + a);
+  if(!el && LF_FILTER !== 'all'){ LF_FILTER = 'all'; render(); el = document.getElementById(pre + a); }
+  if(!el) return;
   [].forEach.call(document.querySelectorAll('.tlhit'), function(x){ x.classList.remove('tlhit'); });
   for(var n = a; n <= b; n++){ var r = document.getElementById(pre + n); if(r){ void r.offsetWidth; r.classList.add('tlhit'); } }
   setHdr();
