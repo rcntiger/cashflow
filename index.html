@@ -221,6 +221,12 @@ svg text{font-family:var(--mono)}
 .hb .hv{text-align:right;white-space:nowrap} .hb .hv small{color:var(--t2);font-size:var(--f-xs)}
 .simL,.simR{display:block}
 @media (max-width:1023px){ .mhide{display:none!important} }
+.slbox{margin-top:14px;padding-top:12px;border-top:1px solid var(--bd)}
+.slbox h3{font-size:var(--f-sm);font-weight:700;color:var(--t2);margin-bottom:10px;display:flex;justify-content:space-between;align-items:center}
+.slg{margin-bottom:12px}.slg:last-child{margin-bottom:2px}
+.slt{display:flex;justify-content:space-between;font-size:var(--f-sm);margin-bottom:4px}
+.slt b{font-family:var(--mono);color:var(--accent)}
+.slg input[type=range]{width:100%;accent-color:var(--accent);cursor:pointer}
 .pc,.pcI{display:none}
 @media (hover:hover){ .row:hover{background:var(--s2);border-radius:8px} tr:hover td{background:var(--s2)} .chip:hover,.hbtn:hover{border-color:var(--accent)} }
 @media (min-width:640px){
@@ -900,12 +906,7 @@ function viewSim(){
   var h = '<div class="chips simtabs"><button class="chip '+(sub==='a'?'on':'')+'" onclick="setSimSub(\'a\')">요약</button><button class="chip '+(sub==='y'?'on':'')+'" onclick="setSimSub(\'y\')">연도별 자산</button></div>';
   h += '<div class="simL'+(sub==='y'?' mhide':'')+'">';
   if(r.firstNeg != null) h += '<div class="alert"><b class="neg">'+ymDot(idxYm(r.firstNeg))+'</b>에 금융자산이 바닥납니다. 생활비를 줄이거나 저축을 늘려 보세요.</div>';
-  h += '<div class="card"><h2>예상 금융자산<span class="sp"></span><button class="btn sub sm" onclick="editAssume()">⚙ 가정 설정</button></h2><div class="grid2">'+
-    '<div class="kv"><div class="k">지금</div><div class="v">'+fm(r.start)+'</div></div>'+
-    keyYears.map(function(y){ var row = r.years.find(function(x){ return x.y === y; }); return row ? '<div class="kv"><div class="k">'+y+'년 말</div><div class="v">'+fm(row.bal)+'</div></div>' : ''; }).join('')+
-    '<div class="kv"><div class="k">최저점</div><div class="v '+(r.minV<0?'neg':'')+'">'+fm(r.minV)+' <span class="tiny">'+ymDot(idxYm(r.minI))+'</span></div></div>'+
-    '</div><div style="margin-top:12px">'+lineChart(pts, {marks:marks})+'</div>'+
-    '<div class="tiny" style="margin-top:8px">물가 '+(s.infl === '' || s.infl == null ? 2.5 : num(s.infl))+'% · 생활비 시작 '+ymDot(s.lifeStart)+' · 기본 생활비 월 '+fm(num(s.spend))+' · '+num(s.endYear)+'년까지</div></div>';
+  h += '<div class="card"><h2>예상 금융자산<span class="sp"></span><button class="btn sub sm" onclick="editAssume()">⚙ 가정 설정</button></h2><div id="simFin">'+simFinBody(r)+'</div>'+simSliders()+'</div>';
   var ph = sortedPhases();
   h += '<div class="card"><h2>생활비 계산 방식</h2><div class="chips" style="margin:0">'+
     '<button class="chip '+(s.spendMode!=='expenses'?'on':'')+'" onclick="setSim(\'spendMode\',\'manual\',\'month\')">직접 입력 (기본 + 구간)</button>'+
@@ -933,6 +934,37 @@ function simAssumeHtml(){
     simField('기본 월 생활비 (만원)', 'spend', 'number', '10')+
     simField('계산 종료 연도', 'endYear', 'number', '1')+
     '</div><div class="tiny">물가를 뺀 실질 기준 · 금융자산만 계산 (부동산 제외)<br>수익률은 예산 탭에서 목적별로 넣습니다 (비우면 물가상승률)<br>은퇴 전: 월 저축액 더함 · 은퇴 후: 월 소득 − 생활비<br>목돈은 해당 월 반영 · 모자라면 ② → ① → ③ 순서로 꺼내 씀</div><div class="btns"><button class="btn" onclick="closeModal()">닫기</button></div>';
+}
+// 시뮬 '예상 금융자산' 카드 본문 (빠른 조절 슬라이더를 움직이면 이 부분만 다시 그림)
+function simFinBody(r){
+  var s = S.sim; r = r || simulate();
+  var keyYears = [2033, 2041, 2046, num(s.endYear)].filter(function(y,i,a){ return a.indexOf(y) === i; });
+  var pts = r.years.map(function(y){ return {x:String(y.y).slice(2), y:y.bal}; });
+  var marks = [{x:String(Math.floor((ymIdx(s.lifeStart)||nowIdx())/12)).slice(2), t:'생활비 시작', c:'var(--warn)'}];
+  return '<div class="grid2">'+
+    '<div class="kv"><div class="k">지금</div><div class="v">'+fm(r.start)+'</div></div>'+
+    keyYears.map(function(y){ var row = r.years.find(function(x){ return x.y === y; }); return row ? '<div class="kv"><div class="k">'+y+'년 말</div><div class="v">'+fm(row.bal)+'</div></div>' : ''; }).join('')+
+    '<div class="kv"><div class="k">최저점</div><div class="v '+(r.minV<0?'neg':'')+'">'+fm(r.minV)+' <span class="tiny">'+ymDot(idxYm(r.minI))+'</span></div></div>'+
+    '</div><div style="margin-top:12px">'+lineChart(pts, {marks:marks})+'</div>'+
+    '<div class="tiny" style="margin-top:8px">물가 '+(s.infl === '' || s.infl == null ? 2.5 : num(s.infl))+'% · 생활비 시작 '+ymDot(s.lifeStart)+' · 기본 생활비 월 '+fm(num(s.spend))+' · '+num(s.endYear)+'년까지</div>';
+}
+// 빠른 시뮬레이션 조절: 끄는 동안 바로 다시 계산, 손을 떼면 저장
+function simSliders(){
+  var s = S.sim, inf = s.infl === '' || s.infl == null ? 2.5 : num(s.infl);
+  var row = function(k, label, min, max, step, v, unit){
+    return '<div class="slg"><div class="slt"><span>'+label+'</span><b id="sl_'+k+'">'+slTxt(k, v)+'</b></div>'+
+      '<input type="range" min="'+min+'" max="'+max+'" step="'+step+'" value="'+v+'" oninput="simSlide(\''+k+'\', this.value)" onchange="commit()"></div>';
+  };
+  return '<div class="slbox"><h3>빠른 시뮬레이션 조절<span class="tiny">끄는 대로 바로 반영</span></h3>'+
+    (s.spendMode !== 'expenses' ? row('spend', '기본 월 생활비', 200, 1500, 10, num(s.spend)) : '')+
+    row('saveBefore', '은퇴 전 월 저축액', 0, 1000, 10, num(s.saveBefore))+
+    row('nomL', '③ 장기투자 수익률 (연, 명목)', 0, 10, 0.1, s.nomL === '' || s.nomL == null ? inf : num(s.nomL))+'</div>';
+}
+function slTxt(k, v){ return k === 'nomL' ? (+v).toFixed(1)+'%' : '월 '+fm(num(v)); }
+function simSlide(k, v){
+  S.sim[k] = num(v);
+  var l = document.getElementById('sl_'+k); if(l) l.textContent = slTxt(k, v);
+  var b = document.getElementById('simFin'); if(b) b.innerHTML = simFinBody();
 }
 function setSimSub(v){ SIMSUB = v; try{ localStorage.setItem('cf_simsub', v); }catch(e){} render(); window.scrollTo(0,0); repaint(); }
 function simField(label, k, type, step){
