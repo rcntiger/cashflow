@@ -226,6 +226,10 @@ svg text{font-family:var(--mono)}
 .hb .hv{text-align:right;white-space:nowrap} .hb .hv small{color:var(--t2);font-size:var(--f-xs)}
 .simL,.simR{display:block}
 @media (max-width:1023px){ .mhide{display:none!important} }
+.atabs{flex-wrap:nowrap;overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none;margin-right:-12px;padding-right:12px}
+.atabs::-webkit-scrollbar{display:none}
+.atabs .am{font-family:var(--mono);font-size:var(--f-xs);opacity:.85;margin-left:2px}
+@media (min-width:1024px){ .atabs{display:none!important} }
 .slbox{margin-top:14px;padding-top:12px;border-top:1px solid var(--bd)}
 .slbox h3{font-size:var(--f-sm);font-weight:700;color:var(--t2);margin-bottom:10px;display:flex;justify-content:space-between;align-items:center}
 .slg{margin-bottom:12px}.slg:last-child{margin-bottom:2px}
@@ -807,15 +811,24 @@ function viewDash(){
   return h;
 }
 
+var ASUB = localStorage.getItem('cf_asub') || 'all';   // 자산 탭(휴대폰) 분류: all / 분류 / debt
+function setAsub(v){ ASUB = v; try{ localStorage.setItem('cf_asub', v); }catch(e){} render(); window.scrollTo(0,0); repaint(); }
 function viewAssets(){
   var t = totals(), h = ownerChips();
   var kc = {}; Object.keys(CATS).forEach(function(c){ var g = c === 'pension' ? 'stock' : c; kc[g] = (kc[g] || 0) + (t.byCat[c] || 0); });
   h += kpis(Object.keys(kc).filter(function(c){ return kc[c] > 0; }).map(function(c){ return [c === 'stock' ? '주식·연금' : CATS[c], fm(kc[c]), '', t.assets ? Math.round(kc[c]/t.assets*100)+'%' : '']; }).concat([['부채', '−'+fm(t.debts), 'neg']]));
+  // 휴대폰: 분류 탭 (PC는 숨김, 모두 표시)
+  var GROUP = {stock:['stock','pension'], pension:null}, GNAME = {stock:'주식·연금'};
+  var tabs = Object.keys(CATS).filter(function(c){ return GROUP[c] !== null && byOwner(S.assets).some(function(a){ return (GROUP[c] || [c]).indexOf(a.cat) >= 0; }); });
+  if(ASUB !== 'all' && ASUB !== 'debt' && tabs.indexOf(ASUB) < 0) ASUB = 'all';
+  var dsum = byOwner(S.debts).reduce(function(s,d){ return s + num(d.value); }, 0);
+  h += '<div class="chips atabs">'+[['all','전체','']].concat(tabs.map(function(c){ return [c, GNAME[c] || CATS[c], fm((GROUP[c] || [c]).reduce(function(s,k){ return s + (t.byCat[k] || 0); }, 0))]; })).concat([['debt','부채', dsum ? '−'+fm(dsum) : '']]).map(function(x){
+    return '<button class="chip '+(ASUB===x[0]?'on':'')+'" onclick="setAsub(\''+x[0]+'\')">'+x[1]+(x[2] ? ' <span class="am">'+x[2]+'</span>' : '')+'</button>'; }).join('')+'</div>';
+  var mh = function(c){ return ASUB === 'all' || ASUB === c ? '' : ' mhide'; };
   // 자산: 카드 밖 큰 제목 줄 + 분류마다 카드
-  h += '<div class="sec-h"><span class="ttl2">자산</span><span class="num sec-sum">'+fm(byOwner(S.assets).reduce(function(s,a){ return s + num(a.value); }, 0))+'</span><span style="flex:1"></span><button class="btn sm" onclick="editAsset()">+ 추가</button></div>';
-  if(!byOwner(S.assets).length) h += '<div class="card"><div class="empty">'+(OWNER?'이 명의의 자산이 없습니다':'아직 자산이 없습니다')+'</div></div>';
-  var GROUP = {stock:['stock','pension'], pension:null};   // 리밸런서에서 함께 오는 주식·연금계좌는 한 카드
-  var GNAME = {stock:'주식·연금'};
+  h += '<div class="sec-h'+(ASUB === 'debt' ? ' mhide' : '')+'"><span class="ttl2">자산</span><span class="num sec-sum">'+fm(byOwner(S.assets).reduce(function(s,a){ return s + num(a.value); }, 0))+'</span><span style="flex:1"></span><button class="btn sm" onclick="editAsset()">+ 추가</button></div>';
+  if(!byOwner(S.assets).length) h += '<div class="card'+(ASUB === 'debt' ? ' mhide' : '')+'"><div class="empty">'+(OWNER?'이 명의의 자산이 없습니다':'아직 자산이 없습니다')+'</div></div>';
+  // GROUP: 리밸런서에서 함께 오는 주식·연금계좌는 한 카드 (위에서 정의)
   Object.keys(CATS).forEach(function(c){
     if(GROUP[c] === null) return;
     var cats = GROUP[c] || [c];
@@ -823,7 +836,7 @@ function viewAssets(){
       .sort(function(a,b){ return cats.indexOf(a.cat) - cats.indexOf(b.cat); });
     if(!list.length) return;
     var gsum = cats.reduce(function(s,k){ return s + (t.byCat[k] || 0); }, 0);
-    h += '<div class="card"><div class="grp big cat-h"><span>'+(GNAME[c] || CATS[c])+'</span><span><span class="num">'+fm(gsum)+'</span><button class="btn sub sm" style="margin-left:10px" onclick="editAsset(\'\',\''+c+'\')" aria-label="'+CATS[c]+' 추가">+</button></span></div>';
+    h += '<div class="card'+mh(c)+'"><div class="grp big cat-h"><span>'+(GNAME[c] || CATS[c])+'</span><span><span class="num">'+fm(gsum)+'</span><button class="btn sub sm" style="margin-left:10px" onclick="editAsset(\'\',\''+c+'\')" aria-label="'+CATS[c]+' 추가">+</button></span></div>';
     list.forEach(function(a){
       h += '<div class="row" onclick="editAsset(\''+a.id+'\')"><div class="m"><div class="t">'+esc(a.name)+
         (cats.length > 1 ? '<span class="tag">'+(a.cat === 'pension' ? '연금' : '주식')+'</span>' : '')+
@@ -833,9 +846,9 @@ function viewAssets(){
     if(c === 'stock') h += '<div class="btns"><button class="btn sub sm" onclick="syncRebalancer()">↻ 리밸런서에서 불러오기</button><button class="btn sub sm" onclick="openRbMap()">리밸런서 계좌 연결</button></div>';
     h += '</div>';
   });
-  if(S.assets.length && !byOwner(S.assets).some(function(a){ return a.cat === 'stock'; })) h += '<div class="btns" style="margin:-4px 0 14px"><button class="btn sub sm" onclick="syncRebalancer()">↻ 리밸런서에서 불러오기</button><button class="btn sub sm" onclick="openRbMap()">리밸런서 계좌 연결</button></div>';
-  h += '<div class="sec-h R"><span class="ttl2">부채</span><span class="num sec-sum">'+fm(byOwner(S.debts).reduce(function(s,d){ return s + num(d.value); }, 0))+'</span><span style="flex:1"></span><button class="btn sm" onclick="editDebt()">+ 추가</button></div>';
-  h += '<div class="card R" style="background:var(--debt-bg);border-color:var(--debt-bd)">';
+  if(S.assets.length && !byOwner(S.assets).some(function(a){ return a.cat === 'stock'; })) h += '<div class="btns'+(ASUB === 'all' ? '' : ' mhide')+'" style="margin:-4px 0 14px"><button class="btn sub sm" onclick="syncRebalancer()">↻ 리밸런서에서 불러오기</button><button class="btn sub sm" onclick="openRbMap()">리밸런서 계좌 연결</button></div>';
+  h += '<div class="sec-h R'+mh('debt')+'"><span class="ttl2">부채</span><span class="num sec-sum">'+fm(byOwner(S.debts).reduce(function(s,d){ return s + num(d.value); }, 0))+'</span><span style="flex:1"></span><button class="btn sm" onclick="editDebt()">+ 추가</button></div>';
+  h += '<div class="card R'+mh('debt')+'" style="background:var(--debt-bg);border-color:var(--debt-bd)">';
   if(!byOwner(S.debts).length) h += '<div class="empty">전세보증금·대출 등을 기록합니다</div>';
   byOwner(S.debts).forEach(function(d){
     var di = [];
