@@ -228,6 +228,7 @@ svg text{font-family:var(--mono)}
 @media (max-width:1023px){ .mhide{display:none!important} }
 .atabs{flex-wrap:nowrap;overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none;margin-right:-12px;padding-right:12px}
 .atabs::-webkit-scrollbar{display:none}
+.card.R .row.dfirst{border-top:0}
 .atabs .am{font-family:var(--mono);font-size:var(--f-xs);opacity:.85;margin-left:2px}
 @media (min-width:1024px){ .atabs{display:none!important} }
 .slbox{margin-top:14px;padding-top:12px;border-top:1px solid var(--bd)}
@@ -811,7 +812,11 @@ function viewDash(){
   return h;
 }
 
-var ASUB = localStorage.getItem('cf_asub') || 'all';   // 자산 탭(휴대폰) 분류: all / 분류 / debt
+var DEBT_KINDS = {deposit:'보증금', loan:'대출', other:'기타'};
+function debtKind(d){ return DEBT_KINDS[d.kind] ? d.kind : (num(d.rate) > 0 || num(d.pay) > 0 ? 'loan' : 'deposit'); }   // 종류 없으면 금리·상환 있으면 대출
+var DSUB = localStorage.getItem('cf_dsub') || 'all';   // 부채 종류 칩(휴대폰)
+function setDsub(v){ DSUB = v; try{ localStorage.setItem('cf_dsub', v); }catch(e){} render(); repaint(); }
+var ASUB = localStorage.getItem('cf_asub') || 'all'; if(ASUB === 'debt') ASUB = 'all';   // 자산 탭(휴대폰) 분류: all / 분류 / debt
 function setAsub(v){ ASUB = v; try{ localStorage.setItem('cf_asub', v); }catch(e){} render(); window.scrollTo(0,0); repaint(); }
 function viewAssets(){
   var t = totals(), h = ownerChips();
@@ -820,15 +825,14 @@ function viewAssets(){
   // 휴대폰: 분류 탭 (PC는 숨김, 모두 표시)
   var GROUP = {stock:['stock','pension'], pension:null}, GNAME = {stock:'주식·연금'};
   var tabs = Object.keys(CATS).filter(function(c){ return GROUP[c] !== null && byOwner(S.assets).some(function(a){ return (GROUP[c] || [c]).indexOf(a.cat) >= 0; }); });
-  if(ASUB !== 'all' && ASUB !== 'debt' && tabs.indexOf(ASUB) < 0) ASUB = 'all';
-  var dsum = byOwner(S.debts).reduce(function(s,d){ return s + num(d.value); }, 0);
-  var atabs = '<div class="chips atabs">'+[['all','전체','']].concat(tabs.map(function(c){ return [c, GNAME[c] || CATS[c], fm((GROUP[c] || [c]).reduce(function(s,k){ return s + (t.byCat[k] || 0); }, 0))]; })).concat([['debt','부채', dsum ? '−'+fm(dsum) : '']]).map(function(x){
+  if(ASUB !== 'all' && tabs.indexOf(ASUB) < 0) ASUB = 'all';
+  var atabs = '<div class="chips atabs">'+[['all','전체','']].concat(tabs.map(function(c){ return [c, GNAME[c] || CATS[c], fm((GROUP[c] || [c]).reduce(function(s,k){ return s + (t.byCat[k] || 0); }, 0))]; })).map(function(x){
     return '<button class="chip '+(ASUB===x[0]?'on':'')+'" onclick="setAsub(\''+x[0]+'\')">'+x[1]+'</button>'; }).join('')+'</div>';
   var mh = function(c){ return ASUB === 'all' || ASUB === c ? '' : ' mhide'; };
   // 자산: 카드 밖 큰 제목 줄 + 분류마다 카드
   h += '<div class="sec-h"><span class="ttl2">자산</span><span class="num sec-sum">'+fm(byOwner(S.assets).reduce(function(s,a){ return s + num(a.value); }, 0))+'</span><span style="flex:1"></span><button class="btn sm" onclick="editAsset()">+ 추가</button></div>';
   h += atabs;   // 휴대폰: 자산 제목 아래 분류 탭
-  if(!byOwner(S.assets).length) h += '<div class="card'+(ASUB === 'debt' ? ' mhide' : '')+'"><div class="empty">'+(OWNER?'이 명의의 자산이 없습니다':'아직 자산이 없습니다')+'</div></div>';
+  if(!byOwner(S.assets).length) h += '<div class="card"><div class="empty">'+(OWNER?'이 명의의 자산이 없습니다':'아직 자산이 없습니다')+'</div></div>';
   // GROUP: 리밸런서에서 함께 오는 주식·연금계좌는 한 카드 (위에서 정의)
   Object.keys(CATS).forEach(function(c){
     if(GROUP[c] === null) return;
@@ -848,16 +852,21 @@ function viewAssets(){
     h += '</div>';
   });
   if(S.assets.length && !byOwner(S.assets).some(function(a){ return a.cat === 'stock'; })) h += '<div class="btns'+(ASUB === 'all' ? '' : ' mhide')+'" style="margin:-4px 0 14px"><button class="btn sub sm" onclick="syncRebalancer()">↻ 리밸런서에서 불러오기</button><button class="btn sub sm" onclick="openRbMap()">리밸런서 계좌 연결</button></div>';
-  h += '<div class="sec-h R'+mh('debt')+'"><span class="ttl2">부채</span><span class="num sec-sum">'+fm(byOwner(S.debts).reduce(function(s,d){ return s + num(d.value); }, 0))+'</span><span style="flex:1"></span><button class="btn sm" onclick="editDebt()">+ 추가</button></div>';
-  h += '<div class="card R'+mh('debt')+'" style="background:var(--debt-bg);border-color:var(--debt-bd)">';
+  var dkinds = Object.keys(DEBT_KINDS).filter(function(k){ return byOwner(S.debts).some(function(d){ return debtKind(d) === k; }); });
+  if(DSUB !== 'all' && dkinds.indexOf(DSUB) < 0) DSUB = 'all';
+  h += '<div class="sec-h R"><span class="ttl2">부채</span><span class="num sec-sum">'+fm(byOwner(S.debts).reduce(function(s,d){ return s + num(d.value); }, 0))+'</span><span style="flex:1"></span><button class="btn sm" onclick="editDebt()">+ 추가</button></div>';
+  if(dkinds.length) h += '<div class="chips atabs R">'+[['all','전체']].concat(dkinds.map(function(k){ return [k, DEBT_KINDS[k]]; })).map(function(x){ return '<button class="chip '+(DSUB===x[0]?'on':'')+'" onclick="setDsub(\''+x[0]+'\')">'+x[1]+'</button>'; }).join('')+'</div>';   // 휴대폰: 부채 종류 칩
+  h += '<div class="card R" style="background:var(--debt-bg);border-color:var(--debt-bd)">';
   if(!byOwner(S.debts).length) h += '<div class="empty">전세보증금·대출 등을 기록합니다</div>';
+  var dSeen = false;   // 휴대폰 종류 칩: 처음 보이는 줄은 위 구분선 없앰
   byOwner(S.debts).forEach(function(d){
     var di = [];
     if(num(d.rate) > 0) di.push('연 '+num(d.rate)+'% · 월 이자 '+fm(num(d.value)*num(d.rate)/1200));
     if(num(d.pay) > 0) di.push('월 상환 '+fm(num(d.pay)));
     if(d.end) di.push('~'+ymDot(d.end));
     if(d.note) di.push(esc(d.note));
-    h += '<div class="row" onclick="editDebt(\''+d.id+'\')"><div class="m"><div class="t">'+esc(d.name)+'</div>'+(di.length?'<div class="tiny">'+di.join(' · ')+'</div>':'')+'</div><div class="v neg">−'+fm(num(d.value))+'</div></div>';
+    var dShow = DSUB === 'all' || DSUB === debtKind(d), dFirst = dShow && !dSeen; if(dShow) dSeen = true;
+    h += '<div class="row'+(dShow ? '' : ' mhide')+(dFirst && DSUB !== 'all' ? ' dfirst' : '')+'" onclick="editDebt(\''+d.id+'\')"><div class="m"><div class="t">'+esc(d.name)+'<span class="tag">'+DEBT_KINDS[debtKind(d)]+'</span></div>'+(di.length?'<div class="tiny">'+di.join(' · ')+'</div>':'')+'</div><div class="v neg">−'+fm(num(d.value))+'</div></div>';
   });
   h += '</div>';
   return h;
@@ -1091,6 +1100,7 @@ function editDebt(id){
   var d = S.debts.find(function(x){ return x.id === id; }) || {};
   openModal('<h3>'+(id?'부채 수정':'부채 추가')+'</h3>'+
     '<label class="f">이름<input id="f_name" value="'+esc(d.name)+'" placeholder="예: 전세보증금"></label>'+
+    '<label class="f">종류<select id="f_kind">'+Object.keys(DEBT_KINDS).map(function(k){ return '<option value="'+k+'"'+(debtKind(d)===k?' selected':'')+'>'+DEBT_KINDS[k]+(k==='deposit'?' (전세·월세)':k==='loan'?' (주택담보·신용 등)':'')+'</option>'; }).join('')+'</select></label>'+
     '<label class="f">명의<select id="f_owner">'+ownerOptions(d.owner)+'</select></label>'+
     '<label class="f">금액 (만원)<input id="f_value" type="number" inputmode="decimal" value="'+esc(d.value)+'"></label>'+
     '<div class="grid2"><label class="f">연 금리 % (이자 있는 대출)<input id="f_rate" type="number" step="0.01" inputmode="decimal" value="'+esc(d.rate)+'" placeholder="예: 5.33"></label>'+
@@ -1099,7 +1109,7 @@ function editDebt(id){
     '<label class="f">상환 끝 (선택)<input id="f_end" type="month" value="'+esc(d.end)+'"></label></div>'+
     '<div class="tiny" style="margin:-4px 0 10px">금리를 넣으면 월 이자(또는 월 상환액)가 현금흐름·시뮬레이션의 지출로 들어갑니다. 전세보증금처럼 이자 없는 부채는 비워 두세요.</div>'+
     '<label class="f">메모<input id="f_note" value="'+esc(d.note)+'"></label>'+
-    '<div class="btns"><button class="btn" onclick="upsertItem(\'debts\',\''+(id||'')+'\',{name:fv(\'f_name\').trim()||\'부채\',owner:fv(\'f_owner\'),value:num(fv(\'f_value\')),rate:fv(\'f_rate\'),pay:fv(\'f_pay\'),start:fv(\'f_start\'),end:fv(\'f_end\'),note:fv(\'f_note\').trim()})">저장</button><button class="btn sub" onclick="closeModal()">취소</button>'+
+    '<div class="btns"><button class="btn" onclick="upsertItem(\'debts\',\''+(id||'')+'\',{name:fv(\'f_name\').trim()||\'부채\',owner:fv(\'f_owner\'),kind:fv(\'f_kind\'),value:num(fv(\'f_value\')),rate:fv(\'f_rate\'),pay:fv(\'f_pay\'),start:fv(\'f_start\'),end:fv(\'f_end\'),note:fv(\'f_note\').trim()})">저장</button><button class="btn sub" onclick="closeModal()">취소</button>'+
     (id?'<span style="flex:1"></span><button class="btn bad" onclick="delItem(\'debts\',\''+id+'\')">삭제</button>':'')+'</div>');
 }
 function editIncome(id, owner){
