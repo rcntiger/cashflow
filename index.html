@@ -822,11 +822,12 @@ function viewAssets(){
   var tabs = Object.keys(CATS).filter(function(c){ return GROUP[c] !== null && byOwner(S.assets).some(function(a){ return (GROUP[c] || [c]).indexOf(a.cat) >= 0; }); });
   if(ASUB !== 'all' && ASUB !== 'debt' && tabs.indexOf(ASUB) < 0) ASUB = 'all';
   var dsum = byOwner(S.debts).reduce(function(s,d){ return s + num(d.value); }, 0);
-  h += '<div class="chips atabs">'+[['all','전체','']].concat(tabs.map(function(c){ return [c, GNAME[c] || CATS[c], fm((GROUP[c] || [c]).reduce(function(s,k){ return s + (t.byCat[k] || 0); }, 0))]; })).concat([['debt','부채', dsum ? '−'+fm(dsum) : '']]).map(function(x){
-    return '<button class="chip '+(ASUB===x[0]?'on':'')+'" onclick="setAsub(\''+x[0]+'\')">'+x[1]+(x[2] ? ' <span class="am">'+x[2]+'</span>' : '')+'</button>'; }).join('')+'</div>';
+  var atabs = '<div class="chips atabs">'+[['all','전체','']].concat(tabs.map(function(c){ return [c, GNAME[c] || CATS[c], fm((GROUP[c] || [c]).reduce(function(s,k){ return s + (t.byCat[k] || 0); }, 0))]; })).concat([['debt','부채', dsum ? '−'+fm(dsum) : '']]).map(function(x){
+    return '<button class="chip '+(ASUB===x[0]?'on':'')+'" onclick="setAsub(\''+x[0]+'\')">'+x[1]+'</button>'; }).join('')+'</div>';
   var mh = function(c){ return ASUB === 'all' || ASUB === c ? '' : ' mhide'; };
   // 자산: 카드 밖 큰 제목 줄 + 분류마다 카드
-  h += '<div class="sec-h'+(ASUB === 'debt' ? ' mhide' : '')+'"><span class="ttl2">자산</span><span class="num sec-sum">'+fm(byOwner(S.assets).reduce(function(s,a){ return s + num(a.value); }, 0))+'</span><span style="flex:1"></span><button class="btn sm" onclick="editAsset()">+ 추가</button></div>';
+  h += '<div class="sec-h"><span class="ttl2">자산</span><span class="num sec-sum">'+fm(byOwner(S.assets).reduce(function(s,a){ return s + num(a.value); }, 0))+'</span><span style="flex:1"></span><button class="btn sm" onclick="editAsset()">+ 추가</button></div>';
+  h += atabs;   // 휴대폰: 자산 제목 아래 분류 탭
   if(!byOwner(S.assets).length) h += '<div class="card'+(ASUB === 'debt' ? ' mhide' : '')+'"><div class="empty">'+(OWNER?'이 명의의 자산이 없습니다':'아직 자산이 없습니다')+'</div></div>';
   // GROUP: 리밸런서에서 함께 오는 주식·연금계좌는 한 카드 (위에서 정의)
   Object.keys(CATS).forEach(function(c){
