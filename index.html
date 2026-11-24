@@ -934,6 +934,7 @@ function viewSim(){
   var h = '<div class="chips simtabs"><button class="chip '+(sub==='a'?'on':'')+'" onclick="setSimSub(\'a\')">요약</button><button class="chip '+(sub==='y'?'on':'')+'" onclick="setSimSub(\'y\')">연도별 자산</button></div>';
   h += '<div class="simL'+(sub==='y'?' mhide':'')+'">';
   if(r.firstNeg != null) h += '<div class="alert"><b class="neg">'+ymDot(idxYm(r.firstNeg))+'</b>에 금융자산이 바닥납니다. 생활비를 줄이거나 저축을 늘려 보세요.</div>';
+  h += '<a class="card" href="https://rcntiger.github.io/pension-manager/#draw" style="display:flex;align-items:center;gap:8px;text-decoration:none;color:inherit"><div style="flex:1"><b>연금 세금·인출 전략 보기</b><div class="tiny">연금저축·IRP·ISA 어느 계좌에서 얼마씩 꺼낼지</div></div>›</a>';
   h += '<div class="card"><h2>예상 금융자산<span class="sp"></span><button class="btn sub sm" onclick="editAssume()">⚙ 가정 설정</button></h2><div id="simFin">'+simFinBody(r)+'</div>'+simSliders()+'</div>';
   var ph = sortedPhases();
   h += '<div class="card"><h2>생활비 계산 방식</h2><div class="chips" style="margin:0">'+
@@ -2426,6 +2427,7 @@ function toggleMove(id){ var m = S.moves.find(function(x){ return x.id === id; }
 /* ════════ 시작 ════════ */
 document.documentElement.dataset.theme = localStorage.getItem('cf_theme') || 'dark';
 if(document.documentElement.dataset.theme === 'light') document.querySelector('meta[name=theme-color]').content = '#EEF3FB';
+(function(){ var h = (location.hash || '').slice(1); if(h === 'flow') h = 'money'; if(TABS.some(function(t){ return t.id === h; })) TAB = h; })();   // 다른 앱에서 #탭 으로 바로 열기
 history.replaceState({tab:TAB}, '', '#'+TAB);
 render();
 setCloud('off');
