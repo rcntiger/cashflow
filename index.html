@@ -1167,6 +1167,7 @@ function openSettings(){
          (_otpEmail ? '<label class="f">'+esc(_otpEmail)+' 로 보낸 코드<input id="f_code" inputmode="numeric" maxlength="6" autocomplete="one-time-code"></label><div class="btns"><button class="btn" onclick="verifyCode()">확인</button><button class="btn sub" onclick="_otpEmail=\'\';openSettings()">다시 입력</button></div>'
           : '<label class="f">이메일<input id="f_email" type="email" autocomplete="email"></label><div class="btns"><button class="btn" onclick="sendCode()">코드 받기</button></div>')))+
     '</div>'+
+    (u ? '<div class="card"><h2>리밸런서 자동 반영</h2><label style="display:flex;gap:10px;align-items:flex-start;cursor:pointer"><input type="checkbox" '+(rbAutoOn()?'checked':'')+' onchange="setRbAuto(this.checked)" style="width:18px;height:18px;margin-top:2px"><span class="tiny">앱을 열거나 돌아올 때 리밸런서 최신 기록으로 연결된 계좌 평가액을 자동으로 맞춥니다 (이 기기)</span></label></div>' : '')+
     (u ? '<div class="card"><h2>자동 갱신 (매월 1일 오전 9시)</h2><div class="tiny">부동산 실거래가, 리밸런서 평가액을 반영하고 그 달 순자산을 기록합니다</div><div class="btns"><button class="btn sub" onclick="runMonthly()">지금 실행</button></div></div>' : '')+
     '<div class="card"><h2>가족 구성원</h2><div class="tiny" style="margin-bottom:8px">닉네임은 화면 표시용이라 언제 바꿔도 장부가 그대로입니다. 비우면 본인·아내로 보입니다</div>'+
     S.members.map(function(m,i){ var me = _user && m.email && m.email === _user.email.toLowerCase();
@@ -1381,6 +1382,7 @@ async function cloudPull(manual){
       applyServer(r.data);
     }
     if(manual) toast('동기화했습니다');
+    setTimeout(autoRebalancer, 300);
   }catch(e){
     _busy = false;
     setCloud('error', /relation|does not exist|schema cache/i.test(e.message) ? 'cashflow 테이블이 없습니다 — supabase/cashflow.sql 을 먼저 실행하세요' : e.message);
@@ -1433,7 +1435,7 @@ async function syncRebalancer(){
 }
 // 리밸런서에서 정한 계좌 종류 (기록에 없으면 null)
 function rbKind(n){ var x = _rbLast && _rbLast.accounts[n]; return x && x.kind != null && ACCT[x.kind] != null ? x.kind : null; }
-function applyRebalancer(){
+function applyRebalancer(quiet){
   var rb = _rbLast, sums = {}, msgs = [], kinds = {};
   Object.keys(rb.accounts).forEach(function(n){ var id = S.rbMap[n]; if(!id) return; sums[id] = (sums[id]||0) + num(rb.accounts[n].value);
     var k = rbKind(n); if(k != null) (kinds[id] = kinds[id] || []).push(k); });
@@ -1446,7 +1448,32 @@ function applyRebalancer(){
     if(man !== num(a.value)) msgs.push(a.name + ' ' + fm(num(a.value)) + '→' + fm(man));
     a.value = man; a.src = '리밸런서 적용 (' + (+rb.date.slice(5,7)) + '월)'; a.srcDetail = '리밸런서 ' + rb.date + ' 기록';
   });
+  if(quiet){
+    if(!msgs.length) return 0;                // 자동 반영: 바뀐 게 없으면 조용히 끝
+    commit(); toast('리밸런서 변경 반영 (' + (+rb.date.slice(5,7)) + '/' + (+rb.date.slice(8,10)) + '): ' + msgs.join(', '));
+    return msgs.length;
+  }
   commit(); toast(msgs.length ? msgs.join(', ') : '변동 없음 (' + rb.date + ')');
+}
+
+/* ── 리밸런서 자동 반영: 앱을 열거나 돌아올 때, 이미 연결된 계좌만 조용히 맞춤 ──
+   새 계좌(연결 안 됨)는 건드리지 않고 알림만. 설정에서 끌 수 있음 (이 기기 기준) */
+var _rbUnmapped = 0;
+function rbAutoOn(){ try{ return localStorage.getItem('cf_rb_auto') !== '0'; }catch(e){ return true; } }
+function setRbAuto(on){ try{ localStorage.setItem('cf_rb_auto', on ? '1' : '0'); }catch(e){} openSettings(); if(on) autoRebalancer(); }
+async function autoRebalancer(){
+  if(!sb || !_user || !rbAutoOn() || !Object.keys(S.rbMap).length) return;
+  try{
+    var r = await sb.from('rebalancer_data').select('history').eq('user_id', _user.id).maybeSingle();
+    if(r.error || !r.data) return;
+    var h = r.data.history || {}, keys = Object.keys(h).sort();
+    if(!keys.length) return;
+    var last = keys[keys.length-1];
+    _rbLast = {date:last, accounts:h[last].accounts || {}};
+    _rbUnmapped = Object.keys(_rbLast.accounts).filter(function(n){ return !(n in S.rbMap); }).length;
+    var n = applyRebalancer(true);
+    if(!n && _rbUnmapped) toast('리밸런서에 연결 안 된 계좌 ' + _rbUnmapped + '개 — 자산 › 리밸런서 계좌 연결');
+  }catch(e){ console.warn('리밸런서 자동 반영 실패', e); }
 }
 
 /* ════════ 부동산 실거래가 (국토부 API, Edge Function realestate-proxy) ════════ */
