@@ -295,6 +295,10 @@ svg text{font-family:var(--mono)}
 <script>
 /* ════════ 기본 상수 ════════ */
 var CATS = {realestate:'부동산', stock:'주식', pension:'연금계좌', mutual:'공제회·저축', cash:'현금·예금', other:'기타'};
+// 계좌 종류 (주식·연금계좌 자산만) — 연금·절세 통합관리 앱이 이 값으로 계좌를 자동 연결
+var ACCT = {'':'일반', pension:'연금저축', irp:'IRP', isa:'ISA'};
+function acctGuess(n){ n = String(n || ''); return /IRP|퇴직|DC/i.test(n) ? 'irp' : /ISA/i.test(n) ? 'isa' : /연금/.test(n) ? 'pension' : ''; }
+function hasAcct(cat){ return cat === 'stock' || cat === 'pension'; }
 var CAT_COLOR = {realestate:'var(--c2)', stock:'var(--c0)', pension:'var(--c1)', mutual:'var(--c3)', cash:'var(--c5)', other:'var(--c4)'};
 var FIN_CATS = ['stock','pension','mutual','cash','other'];   // 시뮬레이션에 넣는 금융자산
 var TABS = [
@@ -844,7 +848,7 @@ function viewAssets(){
     h += '<div class="card'+mh(c)+'"><div class="grp big cat-h"><span>'+(GNAME[c] || CATS[c])+'</span><span><span class="num">'+fm(gsum)+'</span><button class="btn sub sm" style="margin-left:10px" onclick="editAsset(\'\',\''+c+'\')" aria-label="'+CATS[c]+' 추가">+</button></span></div>';
     list.forEach(function(a){
       h += '<div class="row" onclick="editAsset(\''+a.id+'\')"><div class="m"><div class="t">'+esc(a.name)+
-        (cats.length > 1 ? '<span class="tag">'+(a.cat === 'pension' ? '연금' : '주식')+'</span>' : '')+
+        (a.acct && ACCT[a.acct] ? '<span class="tag">'+ACCT[a.acct]+'</span>' : cats.length > 1 ? '<span class="tag">'+(a.cat === 'pension' ? '연금' : '주식')+'</span>' : '')+
         (a.owner ? '<span class="tag">'+esc(nm(a.owner))+'</span>' : '')+(a.bucket ? '<span class="tag">'+BUCKETS[a.bucket].slice(0,1)+'</span>' : '')+(isRbAsset(a.id) ? '<span class="tag">리밸런서</span>' : '')+'</div>'+
         (a.note || a.src ? '<div class="tiny">'+esc([a.note, a.src].filter(Boolean).join(' · '))+'</div>' : '')+'</div><div class="v">'+fm(num(a.value))+(t.assets?'<span class="tiny pcI" style="display:inline-block;width:44px;text-align:right">'+Math.round(num(a.value)/t.assets*100)+'%</span>':'')+'</div></div>';
     });
@@ -1070,8 +1074,9 @@ function fv(id){ return document.getElementById(id).value; }
 function editAsset(id, cat){
   var a = S.assets.find(function(x){ return x.id === id; }) || {cat:cat || 'stock'};
   openModal('<h3>'+(id?'자산 수정':'자산 추가')+'</h3>'+
-    '<label class="f">이름<input id="f_name" value="'+esc(a.name)+'" placeholder="예: 거주 아파트"></label>'+
-    '<label class="f">분류<select id="f_cat" onchange="document.getElementById(\'reBox\').style.display=this.value===\'realestate\'?\'block\':\'none\'">'+Object.keys(CATS).map(function(c){ return '<option value="'+c+'" '+(c===a.cat?'selected':'')+'>'+CATS[c]+'</option>'; }).join('')+'</select></label>'+
+    '<label class="f">이름<input id="f_name" value="'+esc(a.name)+'" placeholder="예: 거주 아파트" oninput="var k=document.getElementById(\'f_acct\');if(k&&!k.dataset.touched)k.value=acctGuess(this.value)"></label>'+
+    '<label class="f">분류<select id="f_cat" onchange="document.getElementById(\'reBox\').style.display=this.value===\'realestate\'?\'block\':\'none\';document.getElementById(\'acctBox\').style.display=hasAcct(this.value)?\'block\':\'none\'">'+Object.keys(CATS).map(function(c){ return '<option value="'+c+'" '+(c===a.cat?'selected':'')+'>'+CATS[c]+'</option>'; }).join('')+'</select></label>'+
+    '<label class="f" id="acctBox" style="display:'+(hasAcct(a.cat)?'block':'none')+'">계좌 종류<select id="f_acct" onchange="this.dataset.touched=1">'+Object.keys(ACCT).map(function(k){ var cur = a.acct != null ? a.acct : acctGuess(a.name); return '<option value="'+k+'" '+(k===cur?'selected':'')+'>'+ACCT[k]+'</option>'; }).join('')+'</select><span class="tiny">연금·절세 통합관리 앱이 이 종류로 계좌를 연결합니다</span></label>'+
     '<label class="f">명의<select id="f_owner">'+ownerOptions(a.owner)+'</select></label>'+
     '<label class="f">평가액 (만원)<input id="f_value" type="number" inputmode="decimal" value="'+esc(a.value)+'"></label>'+
     (a.src ? '<div class="tiny" style="margin:-4px 0 10px">'+esc(a.src)+(a.srcDetail?' · '+esc(a.srcDetail):'')+'</div>' : '')+
@@ -1093,6 +1098,7 @@ function editAsset(id, cat){
 function saveAsset(id, thenTrade){
   var o = {name:fv('f_name').trim()||'이름 없음', cat:fv('f_cat'), owner:fv('f_owner'), value:num(fv('f_value')), note:fv('f_note').trim(), bucket:fv('f_bucket')};
   if(o.bucket === 'auto') o.bucket = defaultBucket(o.cat);
+  o.acct = hasAcct(o.cat) ? fv('f_acct') : '';
   if(o.cat === 'realestate'){ o.lawd = fv('f_lawd').trim(); o.area = fv('f_area').trim(); o.apt = fv('f_apt').trim(); o.dong = fv('f_dong').trim(); o.kbUrl = fv('f_kb').trim(); }
   if(thenTrade){ var it = S.assets.find(function(x){ return x.id === id; }); Object.assign(it, o); localStorage.setItem(LS_DATA, JSON.stringify(S)); META.dirty = true; saveMeta(); cloudSchedule(); render(); fetchTrades(id); return; }
   upsertItem('assets', id, o);
@@ -1410,7 +1416,9 @@ function assetLabel(a){ var o = a.owner ? (a.owner === '공동' ? '공동' : nm(
 function newAssetFromAccount(n){
   var cat = /연금|IRP|퇴직|DC|ISA/i.test(n) ? 'pension' : 'stock';
   if(/ISA/i.test(n)) cat = 'stock';
-  var a = {id:uid(), name:n, cat:cat, owner:'', value:0, note:'', bucket:defaultBucket(cat)};
+  var k = rbKind(n), acct = k != null ? k : acctGuess(n);
+  if(acct) cat = acct === 'isa' ? 'stock' : 'pension';
+  var a = {id:uid(), name:n, cat:cat, acct:acct, owner:'', value:0, note:'', bucket:defaultBucket(cat)};
   S.assets.push(a); return a.id;
 }
 function saveRbMap(){
@@ -1423,9 +1431,15 @@ async function syncRebalancer(){
   if(unmapped.length){ toast('연결 안 된 계좌가 있어 연결 화면을 엽니다'); openRbMap(); return; }
   applyRebalancer();
 }
+// 리밸런서에서 정한 계좌 종류 (기록에 없으면 null)
+function rbKind(n){ var x = _rbLast && _rbLast.accounts[n]; return x && x.kind != null && ACCT[x.kind] != null ? x.kind : null; }
 function applyRebalancer(){
-  var rb = _rbLast, sums = {}, msgs = [];
-  Object.keys(rb.accounts).forEach(function(n){ var id = S.rbMap[n]; if(id) sums[id] = (sums[id]||0) + num(rb.accounts[n].value); });
+  var rb = _rbLast, sums = {}, msgs = [], kinds = {};
+  Object.keys(rb.accounts).forEach(function(n){ var id = S.rbMap[n]; if(!id) return; sums[id] = (sums[id]||0) + num(rb.accounts[n].value);
+    var k = rbKind(n); if(k != null) (kinds[id] = kinds[id] || []).push(k); });
+  // 연결된 리밸런서 계좌들의 종류가 모두 같으면 자산의 계좌 종류로 반영
+  Object.keys(kinds).forEach(function(id){ var a = S.assets.find(function(x){ return x.id === id; }); var ks = kinds[id];
+    if(a && hasAcct(a.cat) && ks.every(function(k){ return k === ks[0]; })) a.acct = ks[0]; });
   Object.keys(sums).forEach(function(id){
     var a = S.assets.find(function(x){ return x.id === id; }); if(!a) return;
     var man = Math.round(sums[id]/10000);
