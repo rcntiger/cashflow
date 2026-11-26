@@ -1099,6 +1099,8 @@ function saveAsset(id, thenTrade){
   var o = {name:fv('f_name').trim()||'이름 없음', cat:fv('f_cat'), owner:fv('f_owner'), value:num(fv('f_value')), note:fv('f_note').trim(), bucket:fv('f_bucket')};
   if(o.bucket === 'auto') o.bucket = defaultBucket(o.cat);
   o.acct = hasAcct(o.cat) ? fv('f_acct') : '';
+  var prev = id && S.assets.find(function(x){ return x.id === id; });
+  if(prev && (prev.owner || '') !== (o.owner || '')) o.ownerSrc = 'manual';   // 직접 바꾼 명의는 리밸런서가 덮어쓰지 않음
   if(o.cat === 'realestate'){ o.lawd = fv('f_lawd').trim(); o.area = fv('f_area').trim(); o.apt = fv('f_apt').trim(); o.dong = fv('f_dong').trim(); o.kbUrl = fv('f_kb').trim(); }
   if(thenTrade){ var it = S.assets.find(function(x){ return x.id === id; }); Object.assign(it, o); localStorage.setItem(LS_DATA, JSON.stringify(S)); META.dirty = true; saveMeta(); cloudSchedule(); render(); fetchTrades(id); return; }
   upsertItem('assets', id, o);
@@ -1391,7 +1393,23 @@ async function cloudPull(manual){
 }
 
 /* ── 리밸런서 연동: 계좌별로 자산에 연결 (주식 계좌 → 주식, 연금저축 계좌 → 연금저축 …) ── */
-var _rbLast = null;   // {date, accounts:{이름:{value}}}  — 로그인한 사람의 리밸런서 최신 기록
+var _rbLast = null;   // {date, accounts:{연결키:{value,label,...}}}  — 로그인한 사람의 리밸런서 최신 기록
+// 리밸런서 기록 정리: 고유번호(id)가 있으면 '#id'로 연결 → 계좌 이름을 바꾸거나 이름이 겹쳐도 연결 유지
+// 예전 이름 연결은 고유번호 연결로 자동 전환
+function rbNormalize(raw){
+  var out = {}, moved = false;
+  Object.keys(raw || {}).forEach(function(k){
+    var v = Object.assign({}, raw[k]); v.label = k;
+    var lk = v.id ? '#' + v.id : k;
+    if(v.id && !(lk in S.rbMap) && (k in S.rbMap)){ S.rbMap[lk] = S.rbMap[k]; delete S.rbMap[k]; moved = true; }
+    out[lk] = v;
+  });
+  if(moved){ try{ localStorage.setItem(LS_DATA, JSON.stringify(S)); META.dirty = true; saveMeta(); cloudSchedule(); }catch(e){} }
+  return out;
+}
+function rbLabel(n){ var x = _rbLast && _rbLast.accounts[n]; return x ? x.label : n; }
+// 리밸런서 명의 → 캐시플로우 구성원 이름 (spouse → 두 번째 구성원)
+function rbOwner(n){ var x = _rbLast && _rbLast.accounts[n]; if(!x || !x.id) return null; var m = S.members || []; return x.owner === 'spouse' ? (m[1] && m[1].name) : (m[0] && m[0].name); }
 function isRbAsset(id){ return Object.keys(S.rbMap).some(function(k){ return S.rbMap[k] === id; }); }
 async function fetchRebalancer(){
   if(!sb || !_user){ alert('⚙ 설정에서 리밸런서와 같은 이메일로 로그인하세요'); return null; }
@@ -1400,7 +1418,7 @@ async function fetchRebalancer(){
   var h = (r.data && r.data.history) || {}, keys = Object.keys(h).sort();
   if(!keys.length){ alert('리밸런서에 자산 기록이 없습니다. 리밸런서에서 시세 조회 후 동기화하세요.'); return null; }
   var last = keys[keys.length-1];
-  _rbLast = {date:last, accounts:h[last].accounts || {}};
+  _rbLast = {date:last, accounts:rbNormalize(h[last].accounts)};
   return _rbLast;
 }
 async function openRbMap(){
@@ -1409,18 +1427,19 @@ async function openRbMap(){
   var opts = function(sel){ return '<option value="">연결 안 함</option>' + S.assets.filter(function(a){ return FIN_CATS.indexOf(a.cat) >= 0; }).map(function(a){
     return '<option value="'+a.id+'" '+(a.id===sel?'selected':'')+'>'+esc(assetLabel(a))+'</option>'; }).join('') + '<option value="new">+ 새 자산으로 추가</option>'; };
   openModal('<h3>리밸런서 계좌 연결</h3><div class="tiny" style="margin-bottom:12px">'+esc(rb.date)+' 기록 기준. 계좌마다 캐시플로우 자산을 고르면, 같은 자산에 연결된 계좌들의 평가액 합계가 그 자산 금액이 됩니다.</div>'+
-    names.map(function(n,i){ return '<label class="f">'+esc(n)+' <span class="num">'+fm(num(rb.accounts[n].value)/10000)+'</span><select id="rbm'+i+'">'+opts(S.rbMap[n])+'</select></label>'; }).join('')+
+    names.map(function(n,i){ var o = rbOwner(n); return '<label class="f">'+esc(rbLabel(n))+(o && rbLabel(n).indexOf(nm(o)) < 0 ? ' <span class="tag">'+esc(nm(o))+'</span>' : '')+' <span class="num">'+fm(num(rb.accounts[n].value)/10000)+'</span><select id="rbm'+i+'">'+opts(S.rbMap[n])+'</select></label>'; }).join('')+
     '<div class="btns"><button class="btn" onclick="saveRbMap()">저장하고 불러오기</button><button class="btn sub" onclick="closeModal()">취소</button></div>');
 }
 // 자산 이름에 명의가 이미 들어 있으면 한 번만 표시
 function assetLabel(a){ var o = a.owner ? (a.owner === '공동' ? '공동' : nm(a.owner)) : ''; return a.name + (o && a.name.indexOf(o) < 0 ? ' (' + o + ')' : ''); }
 // 리밸런서 계좌 이름으로 새 자산 만들기 (이름에 연금·IRP·퇴직이 있으면 연금계좌)
-function newAssetFromAccount(n){
+function newAssetFromAccount(key){
+  var n = rbLabel(key);
   var cat = /연금|IRP|퇴직|DC|ISA/i.test(n) ? 'pension' : 'stock';
   if(/ISA/i.test(n)) cat = 'stock';
-  var k = rbKind(n), acct = k != null ? k : acctGuess(n);
+  var k = rbKind(key), acct = k != null ? k : acctGuess(n);
   if(acct) cat = acct === 'isa' ? 'stock' : 'pension';
-  var a = {id:uid(), name:n, cat:cat, acct:acct, owner:'', value:0, note:'', bucket:defaultBucket(cat)};
+  var a = {id:uid(), name:n, cat:cat, acct:acct, owner:rbOwner(key) || '', value:0, note:'', bucket:defaultBucket(cat)};
   S.assets.push(a); return a.id;
 }
 function saveRbMap(){
@@ -1436,9 +1455,13 @@ async function syncRebalancer(){
 // 리밸런서에서 정한 계좌 종류 (기록에 없으면 null)
 function rbKind(n){ var x = _rbLast && _rbLast.accounts[n]; return x && x.kind != null && ACCT[x.kind] != null ? x.kind : null; }
 function applyRebalancer(quiet){
-  var rb = _rbLast, sums = {}, msgs = [], kinds = {};
+  var rb = _rbLast, sums = {}, msgs = [], kinds = {}, owners = {};
   Object.keys(rb.accounts).forEach(function(n){ var id = S.rbMap[n]; if(!id) return; sums[id] = (sums[id]||0) + num(rb.accounts[n].value);
-    var k = rbKind(n); if(k != null) (kinds[id] = kinds[id] || []).push(k); });
+    var k = rbKind(n); if(k != null) (kinds[id] = kinds[id] || []).push(k);
+    var o = rbOwner(n); if(o) (owners[id] = owners[id] || []).push(o); });
+  // 연결된 리밸런서 계좌들의 명의가 모두 같으면 자산 명의로 반영 (캐시플로우에서 직접 바꾼 명의는 그대로)
+  Object.keys(owners).forEach(function(id){ var a = S.assets.find(function(x){ return x.id === id; }); var os = owners[id];
+    if(a && a.ownerSrc !== 'manual' && os.every(function(o){ return o === os[0]; }) && a.owner !== os[0]){ msgs.push(a.name + ' 명의 → ' + nm(os[0])); a.owner = os[0]; } });
   // 연결된 리밸런서 계좌들의 종류가 모두 같으면 자산의 계좌 종류로 반영
   Object.keys(kinds).forEach(function(id){ var a = S.assets.find(function(x){ return x.id === id; }); var ks = kinds[id];
     if(a && hasAcct(a.cat) && ks.every(function(k){ return k === ks[0]; })) a.acct = ks[0]; });
@@ -1469,7 +1492,7 @@ async function autoRebalancer(){
     var h = r.data.history || {}, keys = Object.keys(h).sort();
     if(!keys.length) return;
     var last = keys[keys.length-1];
-    _rbLast = {date:last, accounts:h[last].accounts || {}};
+    _rbLast = {date:last, accounts:rbNormalize(h[last].accounts)};
     _rbUnmapped = Object.keys(_rbLast.accounts).filter(function(n){ return !(n in S.rbMap); }).length;
     var n = applyRebalancer(true);
     if(!n && _rbUnmapped) toast('리밸런서에 연결 안 된 계좌 ' + _rbUnmapped + '개 — 자산 › 리밸런서 계좌 연결');
